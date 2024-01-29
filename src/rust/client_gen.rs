@@ -617,7 +617,7 @@ fn make_part(param: &Param) -> RustResult {
     if param.tpe == DataType::Binary {
         Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::stream(" + &param.name + r#").mime_str("application/octet-stream")?)"#)
     } else if param.tpe == DataType::String {
-        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(" + &param.name + r#".into()).mime_str("text/plain; charset=utf-8")?)"#)
+        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(" + &param.name + r#".to_string()).mime_str("text/plain; charset=utf-8")?)"#)
     } else if let DataType::Model(_) = param.tpe {
         Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(serde_json::to_string(" + &param.name + r#")?).mime_str("application/json")?)"#)
     } else {
