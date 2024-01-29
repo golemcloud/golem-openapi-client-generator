@@ -610,36 +610,18 @@ fn header_setter(param: &Param) -> RustResult {
     Ok(code)
 }
 
-fn make_part(param: &Param) -> RustPrinter {
+#[rustfmt::skip]
+fn make_part(param: &Param) -> RustResult {
     let part_type = rust_name("reqwest::multipart", "Part");
 
     if param.tpe == DataType::Binary {
-        indent()
-            + r#".part(""#
-            + &param.original_name
-            + r#"", "#
-            + part_type
-            + "::stream("
-            + &param.name
-            + r#").mime_str("application/octet-stream")?)"#
+        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::stream(" + &param.name + r#").mime_str("application/octet-stream")?)"#)
     } else if param.tpe == DataType::String {
-        indent()
-            + r#".part(""#
-            + &param.original_name
-            + r#"", "#
-            + part_type
-            + "::text("
-            + &param.name
-            + r#".into()).mime_str("text/plain; charset=utf-8")?)"#
+        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(" + &param.name + r#".into()).mime_str("text/plain; charset=utf-8")?)"#)
+    } else if let DataType::Model(_) = param.tpe {
+        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(serde_json::to_string(" + &param.name + r#")?).mime_str("application/json")?)"#)
     } else {
-        indent()
-            + r#".part(""#
-            + &param.original_name
-            + r#"", "#
-            + part_type
-            + "::text(serde_json::to_string("
-            + &param.name
-            + r#")?).mime_str("application/json")?)"#
+        Err(Error::unimplemented(format!("Unsupported multipart part type {:?}", param.tpe)))
     }
 }
 
@@ -800,7 +782,7 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
         }
     };
 
-    let multipart_parts: Vec<RustPrinter> = method
+    let multipart_parts: Result<Vec<RustPrinter>> = method
         .params
         .iter()
         .filter(|p| p.kind == ParamKind::Multipart)
@@ -812,7 +794,7 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
         let code = unit() +
             indent() + "let form = " + rust_name("reqwest::multipart", "Form") + "::new()" +
             indented(
-                multipart_parts.into_iter().map(|p| unit() + NewLine + p).reduce(|acc, e| acc + e). unwrap_or_else(unit) + ";" + NewLine
+                multipart_parts?.into_iter().map(|p| unit() + NewLine + p).reduce(|acc, e| acc + e). unwrap_or_else(unit) + ";" + NewLine
             ) +
             NewLine +
             line("request = request.multipart(form);");
