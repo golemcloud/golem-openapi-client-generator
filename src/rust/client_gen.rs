@@ -622,6 +622,15 @@ fn make_part(param: &Param) -> RustPrinter {
             + "::stream("
             + &param.name
             + r#").mime_str("application/octet-stream")?)"#
+    } else if param.tpe == DataType::String {
+        indent()
+            + r#".part(""#
+            + &param.original_name
+            + r#"", "#
+            + part_type
+            + "::text("
+            + &param.name
+            + r#".into()).mime_str("text/plain; charset=utf-8")?)"#
     } else {
         indent()
             + r#".part(""#
