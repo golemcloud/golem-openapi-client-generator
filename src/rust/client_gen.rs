@@ -497,8 +497,15 @@ fn trait_method(
 ) -> Result<Method> {
     let (result_code, result_type) = method_result(&op.op.responses.responses, ref_cache)?;
 
+    let name =
+        if let Some(op_id) = &op.op.operation_id {
+            op_id.to_case(Case::Snake)
+        } else {
+            op.path.strip_prefix(prefix_length).method_name(&op.method)
+        };
+
     Ok(Method {
-        name: op.path.strip_prefix(prefix_length).method_name(&op.method),
+        name,
         path: op.path.clone(),
         original_path: op.original_path.clone(),
         http_method: op.method.to_string(),
