@@ -22,8 +22,8 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None, rename_all = "kebab-case")]
 struct Command {
-    #[arg(short, long, value_name = "spec", value_hint = clap::ValueHint::FilePath)]
-    spec_yaml: PathBuf,
+    #[arg(short, long, value_name = "spec", value_hint = clap::ValueHint::FilePath, num_args = 1..)]
+    spec_yaml: Vec<PathBuf>,
 
     #[arg(short, long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
     output_directory: PathBuf,
@@ -38,14 +38,20 @@ struct Command {
 fn main() {
     let command = Command::parse();
 
-    let file = File::open(command.spec_yaml).unwrap();
-
-    let reader = BufReader::new(file);
-
-    let openapi: OpenAPI = serde_yaml::from_reader(reader).expect("Could not deserialize input");
+    let openapi_specs = command
+        .spec_yaml
+        .into_iter()
+        .map(|spec| {
+            let file = File::open(&spec).unwrap();
+            let reader = BufReader::new(file);
+            let openapi: OpenAPI = serde_yaml::from_reader(reader)
+                .expect(format!("Could not deserialize input: {:?}", spec).as_str());
+            openapi
+        })
+        .collect::<Vec<_>>();
 
     gen(
-        openapi,
+        openapi_specs,
         &command.output_directory,
         &command.name,
         &command.client_version,
