@@ -2,8 +2,9 @@ use indexmap::IndexMap;
 use openapiv3::{Components, ExternalDocumentation, OpenAPI, Paths};
 
 use crate::Error;
+use crate::Result;
 
-pub(crate) fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> crate::Result<OpenAPI> {
+pub(crate) fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> Result<OpenAPI> {
     if openapi_specs.is_empty() {
         Err(Error::unexpected("No OpenAPI specs provided"))
     } else if openapi_specs.len() == 1 {
@@ -22,7 +23,7 @@ pub(crate) fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> crate::Res
     }
 }
 
-fn merge_openapi_specs(a: OpenAPI, b: OpenAPI) -> crate::Result<OpenAPI> {
+fn merge_openapi_specs(a: OpenAPI, b: OpenAPI) -> Result<OpenAPI> {
     let openapi_version = {
         if a.openapi != b.openapi {
             return Err(Error::unexpected("OpenAPI versions do not match"));
@@ -60,17 +61,17 @@ fn merge_openapi_specs(a: OpenAPI, b: OpenAPI) -> crate::Result<OpenAPI> {
             paths: b_paths,
             extensions: b_extensions,
         } = b.paths;
-        let all_paths = merge_unique(a_paths, b_paths);
-        let all_extensions = merge_unique(a_extensions, b_extensions);
+        let all_paths = merge_unique(a_paths, b_paths)?;
+        let all_extensions = merge_unique(a_extensions, b_extensions)?;
         Paths {
             paths: all_paths,
             extensions: all_extensions,
         }
     };
 
-    let components = merge_components(a.components, b.components);
+    let components = merge_components(a.components, b.components)?;
     let security = merge_unique_option_list(a.security, b.security);
-    let extensions = merge_unique(a.extensions, b.extensions);
+    let extensions = merge_unique(a.extensions, b.extensions)?;
 
     let external_docs = merge_external_docs(a.external_docs, b.external_docs)?;
 
@@ -89,8 +90,8 @@ fn merge_openapi_specs(a: OpenAPI, b: OpenAPI) -> crate::Result<OpenAPI> {
     Ok(result)
 }
 
-fn merge_components(a: Option<Components>, b: Option<Components>) -> Option<Components> {
-    match (a, b) {
+fn merge_components(a: Option<Components>, b: Option<Components>) -> Result<Option<Components>> {
+    let result = match (a, b) {
         (Some(a), Some(b)) => {
             let Components {
                 schemas: a_schemas,
@@ -119,23 +120,25 @@ fn merge_components(a: Option<Components>, b: Option<Components>) -> Option<Comp
             } = b;
 
             let merged = Components {
-                schemas: merge_unique(a_schemas, b_schemas),
-                responses: merge_unique(a_responses, b_responses),
-                parameters: merge_unique(a_parameters, b_parameters),
-                examples: merge_unique(a_examples, b_examples),
-                request_bodies: merge_unique(a_request_bodies, b_request_bodies),
-                headers: merge_unique(a_headers, b_headers),
-                security_schemes: merge_unique(a_security_schemes, b_security_schemes),
-                links: merge_unique(a_links, b_links),
-                callbacks: merge_unique(a_callbacks, b_callbacks),
-                extensions: merge_unique(a_extensions, b_extensions),
+                schemas: merge_unique(a_schemas, b_schemas)?,
+                responses: merge_unique(a_responses, b_responses)?,
+                parameters: merge_unique(a_parameters, b_parameters)?,
+                examples: merge_unique(a_examples, b_examples)?,
+                request_bodies: merge_unique(a_request_bodies, b_request_bodies)?,
+                headers: merge_unique(a_headers, b_headers)?,
+                security_schemes: merge_unique(a_security_schemes, b_security_schemes)?,
+                links: merge_unique(a_links, b_links)?,
+                callbacks: merge_unique(a_callbacks, b_callbacks)?,
+                extensions: merge_unique(a_extensions, b_extensions)?,
             };
             Some(merged)
         }
         (Some(a), None) => Some(a),
         (None, Some(b)) => Some(b),
         (None, None) => None,
-    }
+    };
+
+    Ok(result)
 }
 
 fn merge_external_docs(
@@ -179,7 +182,7 @@ fn merge_external_docs(
                 a_url
             };
 
-            let extensions = merge_unique(a_extensions, b_extensions);
+            let extensions = merge_unique(a_extensions, b_extensions)?;
 
             Some(ExternalDocumentation {
                 description,
@@ -211,26 +214,27 @@ fn merge_unique_option_list<Key, Item>(
 }
 
 fn merge_unique<Key, Item>(
-    a: impl IntoIterator<Item = (Key, Item)>,
-    b: impl IntoIterator<Item = (Key, Item)>,
-) -> IndexMap<Key, Item>
+    mut a: IndexMap<Key, Item>,
+    b: IndexMap<Key, Item>,
+) -> Result<IndexMap<Key, Item>>
 where
     Key: std::fmt::Debug + Eq + std::hash::Hash,
+    Item: PartialEq,
 {
-    let mut map = IndexMap::new();
-    for (key, value) in a {
-        map.insert(key, value);
-    }
     for (key, value) in b {
-        match map.entry(key) {
+        match a.entry(key) {
             indexmap::map::Entry::Occupied(entry) => {
-                #[cfg(debug_assertions)]
-                println!("Entry is already occupied {:?}", entry.key());
+                if entry.get() != &value {
+                    return Err(Error::unexpected(format!(
+                        "Duplicate key {:?} with different values",
+                        entry.key()
+                    )));
+                }
             }
             indexmap::map::Entry::Vacant(entry) => {
                 entry.insert(value);
             }
         }
     }
-    map
+    Ok(a)
 }
