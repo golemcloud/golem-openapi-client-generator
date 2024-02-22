@@ -22,7 +22,7 @@ use std::path::PathBuf;
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None, rename_all = "kebab-case")]
 struct Command {
-    #[arg(short, long, value_name = "spec", value_hint = clap::ValueHint::FilePath, num_args = 1..)]
+    #[arg(short, long, value_name = "spec", value_hint = clap::ValueHint::FilePath, num_args = 1.., required = true)]
     spec_yaml: Vec<PathBuf>,
 
     #[arg(short, long, value_name = "DIR", value_hint = clap::ValueHint::DirPath)]
