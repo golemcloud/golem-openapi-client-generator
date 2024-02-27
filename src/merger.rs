@@ -4,7 +4,7 @@ use openapiv3::{Components, ExternalDocumentation, OpenAPI, Paths};
 use crate::Error;
 use crate::Result;
 
-pub(crate) fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> Result<OpenAPI> {
+pub fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> Result<OpenAPI> {
     if openapi_specs.is_empty() {
         Err(Error::unexpected("No OpenAPI specs provided"))
     } else if openapi_specs.len() == 1 {
@@ -46,10 +46,19 @@ fn merge_openapi_specs(a: OpenAPI, b: OpenAPI) -> Result<OpenAPI> {
     };
 
     let all_tags = {
-        let mut tags = a.tags;
-        let mut b_tags = b.tags;
-        tags.append(&mut b_tags);
-        tags
+        let a_tags_map = a
+            .tags
+            .into_iter()
+            .map(|tag| (tag.name.clone(), tag))
+            .collect::<IndexMap<_, _>>();
+        let b_tags_map = b
+            .tags
+            .into_iter()
+            .map(|tag| (tag.name.clone(), tag))
+            .collect::<IndexMap<_, _>>();
+        let merged = merge_unique(a_tags_map, b_tags_map)?;
+
+        merged.into_values().collect::<Vec<_>>()
     };
 
     let all_paths = {
