@@ -78,7 +78,8 @@ fn main() {
 fn parse_openapi_specs(spec: &Vec<PathBuf>) -> Vec<OpenAPI> {
     spec.into_iter()
         .map(|spec| {
-            let file = File::open(&spec).unwrap();
+            let file =
+                File::open(&spec).expect(format!("Could not open file: {:?}", spec).as_str());
             let reader = BufReader::new(file);
             let openapi: OpenAPI = serde_yaml::from_reader(reader)
                 .expect(format!("Could not deserialize input: {:?}", spec).as_str());

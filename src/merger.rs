@@ -228,15 +228,17 @@ fn merge_unique<Key, Item>(
 ) -> Result<IndexMap<Key, Item>>
 where
     Key: std::fmt::Debug + Eq + std::hash::Hash,
-    Item: PartialEq,
+    Item: std::fmt::Debug + PartialEq,
 {
     for (key, value) in b {
         match a.entry(key) {
             indexmap::map::Entry::Occupied(entry) => {
                 if entry.get() != &value {
                     return Err(Error::unexpected(format!(
-                        "Duplicate key {:?} with different values",
-                        entry.key()
+                        "Duplicate key {:?} with different values \n Current {:?} \n New {:?}",
+                        entry.key(),
+                        entry.get(),
+                        value
                     )));
                 }
             }
