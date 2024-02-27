@@ -48,7 +48,7 @@ struct MergeArgs {
     #[arg(short, long, value_name = "specs", value_hint = clap::ValueHint::FilePath, num_args = 1.., required = true)]
     spec_yaml: Vec<PathBuf>,
     #[arg(short, long, value_name = "output", value_hint = clap::ValueHint::FilePath)]
-    output_file: PathBuf,
+    output_yaml: PathBuf,
 }
 
 fn main() {
@@ -69,7 +69,7 @@ fn main() {
             let openapi_specs = parse_openapi_specs(&args.spec_yaml);
             let openapi =
                 golem_openapi_client_generator::merge_all_openapi_specs(openapi_specs).unwrap();
-            let file = File::create(&args.output_file).unwrap();
+            let file = File::create(&args.output_yaml).unwrap();
             serde_yaml::to_writer(file, &openapi).unwrap();
         }
     }
