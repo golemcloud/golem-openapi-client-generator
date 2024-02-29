@@ -18,9 +18,12 @@ use openapiv3::OpenAPI;
 use std::path::Path;
 use std::result;
 
+pub(crate) mod merger;
 pub(crate) mod printer;
 mod rust;
 mod toml;
+
+pub use merger::merge_all_openapi_specs;
 
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -54,7 +57,9 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-pub fn gen(open_api: OpenAPI, target: &Path, name: &str, version: &str) -> Result<()> {
+pub fn gen(openapi_specs: Vec<OpenAPI>, target: &Path, name: &str, version: &str) -> Result<()> {
+    let open_api = merge_all_openapi_specs(openapi_specs)?;
+
     let src = target.join("src");
     let api = src.join("api");
     let model = src.join("model");
