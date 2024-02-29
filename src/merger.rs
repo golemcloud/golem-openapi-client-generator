@@ -13,13 +13,7 @@ pub fn merge_all_openapi_specs(openapi_specs: Vec<OpenAPI>) -> Result<OpenAPI> {
         let mut openapi_specs = openapi_specs;
         let first = openapi_specs.pop().unwrap();
         let rest = openapi_specs;
-        rest.into_iter().fold(Ok(first), |acc, open_api| {
-            if let Ok(acc) = acc {
-                merge_openapi_specs(acc, open_api)
-            } else {
-                acc
-            }
-        })
+        rest.into_iter().try_fold(first, merge_openapi_specs)
     }
 }
 
