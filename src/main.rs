@@ -56,7 +56,7 @@ fn main() {
 
     match command {
         Cli::Generate(args) => {
-            let openapi_specs = parse_openapi_specs(&args.spec_yaml);
+            let openapi_specs = parse_openapi_specs(args.spec_yaml).unwrap();
             gen(
                 openapi_specs,
                 &args.output_directory,
@@ -66,7 +66,7 @@ fn main() {
             .unwrap();
         }
         Cli::Merge(args) => {
-            let openapi_specs = parse_openapi_specs(&args.spec_yaml);
+            let openapi_specs = parse_openapi_specs(args.spec_yaml).unwrap();
             let openapi =
                 golem_openapi_client_generator::merge_all_openapi_specs(openapi_specs).unwrap();
             let file = File::create(&args.output_yaml).unwrap();
@@ -75,15 +75,13 @@ fn main() {
     }
 }
 
-fn parse_openapi_specs(spec: &Vec<PathBuf>) -> Vec<OpenAPI> {
-    spec.into_iter()
-        .map(|spec| {
-            let file =
-                File::open(&spec).expect(format!("Could not open file: {:?}", spec).as_str());
+fn parse_openapi_specs(spec: Vec<PathBuf>) -> Result<Vec<OpenAPI>, Box<dyn std::error::Error>> {
+    spec.iter()
+        .map(|spec_path| {
+            let file = File::open(spec_path)?;
             let reader = BufReader::new(file);
-            let openapi: OpenAPI = serde_yaml::from_reader(reader)
-                .expect(format!("Could not deserialize input: {:?}", spec).as_str());
-            openapi
+            let openapi: OpenAPI = serde_yaml::from_reader(reader)?;
+            Ok(openapi)
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
