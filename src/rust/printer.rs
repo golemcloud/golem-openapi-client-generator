@@ -123,8 +123,13 @@ pub fn line<T: IntoRustTree>(code: T) -> TreePrinter<RustContext> {
 }
 
 pub fn rust_name(import: &str, name: &str) -> TreePrinter<RustContext> {
+    let import_name = if name.ends_with('!') {
+        &name[0..name.len() - 1]
+    } else {
+        name
+    };
     TreePrinter::leaf(RustCode {
-        imports: HashSet::from([RustUse(format!("{import}::{name}"))]),
+        imports: HashSet::from([RustUse(format!("{import}::{import_name}"))]),
         code: name.to_string(),
     })
 }
@@ -155,10 +160,10 @@ mod tests {
         let error = rust_name("trace", "error!");
 
         #[rustfmt::skip]
-        let p = unit()
+            let p = unit()
             + line("pub fn m() {")
             + indented(
-                line(info + "(\"abc\");")
+            line(info + "(\"abc\");")
                 + line(error + "(\"def\")"))
             + line("}");
 

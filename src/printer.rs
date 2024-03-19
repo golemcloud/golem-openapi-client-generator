@@ -227,8 +227,7 @@ impl<C: PrintContext> Add<NewLine> for TreePrinter<C> {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::printer::{PrintContext, Printer, TreePrinter};
+    use crate::printer::{PrintContext, TreePrinter};
 
     struct StringContext {
         ctx: String,
@@ -252,7 +251,7 @@ mod tests {
 
         let mut ctx = StringContext { ctx: String::new() };
 
-        p.printer().print(&mut ctx);
+        p.print(&mut ctx);
 
         assert_eq!(ctx.ctx, "abc")
     }
@@ -265,7 +264,7 @@ mod tests {
 
         let mut ctx = StringContext { ctx: String::new() };
 
-        p.printer().print(&mut ctx);
+        p.print(&mut ctx);
 
         assert_eq!(ctx.ctx, "abcdef")
     }
