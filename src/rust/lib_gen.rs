@@ -40,7 +40,7 @@ pub enum Attribute {
 impl Attribute {
     fn code(&self) -> RustPrinter {
         match self {
-            Attribute::DenyClippy => line(unit() + "#![deny(clippy::all)]"),
+            Attribute::DenyClippy => line(unit() + "#[deny(clippy::all)]"),
         }
     }
 }
@@ -159,9 +159,9 @@ mod tests {
         );
 
         let expected = indoc! { r#"
-            #![deny(clippy::all)]
+            #[deny(clippy::all)]
             mod abc;
-            #![deny(clippy::all)]
+            #[deny(clippy::all)]
             mod xyz;
 
             pub use lib::abc::B;
