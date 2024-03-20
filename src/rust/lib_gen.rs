@@ -33,20 +33,42 @@ impl Verbosity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
+pub enum Attribute {
+    DenyClippy,
+}
+
+impl Attribute {
+    fn code(&self) -> RustPrinter {
+        match self {
+            Attribute::DenyClippy => line(unit() + "#![deny(clippy)]"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct ModuleName {
     name: String,
     verbosity: Verbosity,
+    attributes: Vec<Attribute>,
 }
 
 impl ModuleName {
     fn code(&self) -> RustPrinter {
-        line(unit() + self.verbosity.render() + "mod " + escape_keywords(&self.name) + ";")
+        unit()
+            + self
+                .attributes
+                .iter()
+                .map(|a| a.code())
+                .reduce(|acc, e| acc + line(e))
+                .unwrap_or_else(unit)
+            + line(unit() + self.verbosity.render() + "mod " + escape_keywords(&self.name) + ";")
     }
 
     pub fn new<S: Into<String>>(s: S) -> ModuleName {
         ModuleName {
             name: s.into(),
             verbosity: Verbosity::Default,
+            attributes: vec![Attribute::DenyClippy],
         }
     }
 
@@ -54,6 +76,7 @@ impl ModuleName {
         ModuleName {
             name: s.into(),
             verbosity: Verbosity::Pub,
+            attributes: vec![Attribute::DenyClippy],
         }
     }
 
@@ -136,7 +159,9 @@ mod tests {
         );
 
         let expected = indoc! { r#"
+            #![deny(clippy)]
             mod abc;
+            #![deny(clippy)]
             mod xyz;
 
             pub use lib::abc::B;
