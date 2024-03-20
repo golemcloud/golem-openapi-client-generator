@@ -109,7 +109,7 @@ pub fn lib_gen(self_name: &str, modules: &[ModuleDef]) -> String {
         .unwrap_or_else(unit);
 
     let code =
-        line(unit() + "#![deny(clippy::all)]") + NewLine + mods + NewLine + uses;
+        line(unit() + "#![allow(clippy::all)]") + NewLine + mods + NewLine + uses;
 
     RustContext::new().print_to_string(code)
 }
@@ -137,7 +137,7 @@ mod tests {
         );
 
         let expected = indoc! { r#"
-            #![deny(clippy::all)]
+            #![allow(clippy::all)]
 
             mod abc;
             mod xyz;
