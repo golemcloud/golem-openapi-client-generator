@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use clap::{Args, Parser};
-use golem_openapi_client_generator::gen;
-use openapiv3::OpenAPI;
 use std::fs::File;
-use std::io::BufReader;
 use std::path::PathBuf;
+
+use clap::{Args, Parser};
+
+use golem_openapi_client_generator::{gen, parse_openapi_specs};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None, rename_all = "kebab-case")]
@@ -56,32 +56,22 @@ fn main() {
 
     match command {
         Cli::Generate(args) => {
-            let openapi_specs = parse_openapi_specs(args.spec_yaml).unwrap();
+            let openapi_specs = parse_openapi_specs(&args.spec_yaml).unwrap();
             gen(
                 openapi_specs,
                 &args.output_directory,
                 &args.name,
                 &args.client_version,
+                true,
             )
             .unwrap();
         }
         Cli::Merge(args) => {
-            let openapi_specs = parse_openapi_specs(args.spec_yaml).unwrap();
+            let openapi_specs = parse_openapi_specs(&args.spec_yaml).unwrap();
             let openapi =
                 golem_openapi_client_generator::merge_all_openapi_specs(openapi_specs).unwrap();
             let file = File::create(&args.output_yaml).unwrap();
             serde_yaml::to_writer(file, &openapi).unwrap();
         }
     }
-}
-
-fn parse_openapi_specs(spec: Vec<PathBuf>) -> Result<Vec<OpenAPI>, Box<dyn std::error::Error>> {
-    spec.iter()
-        .map(|spec_path| {
-            let file = File::open(spec_path)?;
-            let reader = BufReader::new(file);
-            let openapi: OpenAPI = serde_yaml::from_reader(reader)?;
-            Ok(openapi)
-        })
-        .collect()
 }
