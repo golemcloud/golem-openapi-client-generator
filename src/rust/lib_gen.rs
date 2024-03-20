@@ -108,8 +108,7 @@ pub fn lib_gen(self_name: &str, modules: &[ModuleDef]) -> String {
         .reduce(|acc, e| acc + e)
         .unwrap_or_else(unit);
 
-    let code =
-        line(unit() + "#![allow(clippy::all)]") + NewLine + mods + NewLine + uses;
+    let code = line(unit() + "#![allow(clippy::all)]") + NewLine + mods + NewLine + uses;
 
     RustContext::new().print_to_string(code)
 }
