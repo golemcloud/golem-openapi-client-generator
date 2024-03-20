@@ -33,42 +33,20 @@ impl Verbosity {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
-pub enum Attribute {
-    DenyClippy,
-}
-
-impl Attribute {
-    fn code(&self) -> RustPrinter {
-        match self {
-            Attribute::DenyClippy => line(unit() + "#[deny(clippy::all)]"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct ModuleName {
     name: String,
     verbosity: Verbosity,
-    attributes: Vec<Attribute>,
 }
 
 impl ModuleName {
     fn code(&self) -> RustPrinter {
-        unit()
-            + self
-                .attributes
-                .iter()
-                .map(|a| a.code())
-                .reduce(|acc, e| acc + line(e))
-                .unwrap_or_else(unit)
-            + line(unit() + self.verbosity.render() + "mod " + escape_keywords(&self.name) + ";")
+        line(unit() + self.verbosity.render() + "mod " + escape_keywords(&self.name) + ";")
     }
 
     pub fn new<S: Into<String>>(s: S) -> ModuleName {
         ModuleName {
             name: s.into(),
             verbosity: Verbosity::Default,
-            attributes: vec![Attribute::DenyClippy],
         }
     }
 
@@ -76,7 +54,6 @@ impl ModuleName {
         ModuleName {
             name: s.into(),
             verbosity: Verbosity::Pub,
-            attributes: vec![Attribute::DenyClippy],
         }
     }
 
@@ -131,7 +108,8 @@ pub fn lib_gen(self_name: &str, modules: &[ModuleDef]) -> String {
         .reduce(|acc, e| acc + e)
         .unwrap_or_else(unit);
 
-    let code = mods + NewLine + uses;
+    let code =
+        line(unit() + "#![deny(clippy::all)]") + NewLine + mods + NewLine + uses;
 
     RustContext::new().print_to_string(code)
 }
@@ -159,9 +137,9 @@ mod tests {
         );
 
         let expected = indoc! { r#"
-            #[deny(clippy::all)]
+            #![deny(clippy::all)]
+
             mod abc;
-            #[deny(clippy::all)]
             mod xyz;
 
             pub use lib::abc::B;
