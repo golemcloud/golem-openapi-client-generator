@@ -12,18 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::fs::File;
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
+use std::result;
+
+use openapiv3::OpenAPI;
+
+pub use merger::merge_all_openapi_specs;
+
 use crate::rust::lib_gen::{Module, ModuleDef, ModuleName};
 use crate::rust::model_gen::RefCache;
-use openapiv3::OpenAPI;
-use std::path::Path;
-use std::result;
 
 pub(crate) mod merger;
 pub(crate) mod printer;
 mod rust;
 mod toml;
-
-pub use merger::merge_all_openapi_specs;
 
 #[derive(Debug, Clone)]
 pub enum Error {
@@ -57,7 +61,13 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-pub fn gen(openapi_specs: Vec<OpenAPI>, target: &Path, name: &str, version: &str) -> Result<()> {
+pub fn gen(
+    openapi_specs: Vec<OpenAPI>,
+    target: &Path,
+    name: &str,
+    version: &str,
+    overwrite_cargo: bool,
+) -> Result<()> {
     let open_api = merge_all_openapi_specs(openapi_specs)?;
 
     let src = target.join("src");
@@ -138,8 +148,23 @@ pub fn gen(openapi_specs: Vec<OpenAPI>, target: &Path, name: &str, version: &str
     let lib = rust::lib_gen::lib_gen("crate", &module_defs);
     std::fs::write(src.join("lib.rs"), lib).unwrap();
 
-    let cargo = toml::cargo::gen(name, version);
-    std::fs::write(target.join("Cargo.toml"), cargo).unwrap();
+    if overwrite_cargo {
+        let cargo = toml::cargo::gen(name, version);
+        std::fs::write(target.join("Cargo.toml"), cargo).unwrap();
+    }
 
     Ok(())
+}
+
+pub fn parse_openapi_specs(
+    spec: &[PathBuf],
+) -> std::result::Result<Vec<OpenAPI>, Box<dyn std::error::Error>> {
+    spec.iter()
+        .map(|spec_path| {
+            let file = File::open(spec_path)?;
+            let reader = BufReader::new(file);
+            let openapi: OpenAPI = serde_yaml::from_reader(reader)?;
+            Ok(openapi)
+        })
+        .collect()
 }
