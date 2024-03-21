@@ -67,6 +67,7 @@ pub fn gen(
     name: &str,
     version: &str,
     overwrite_cargo: bool,
+    disable_clippy: bool,
 ) -> Result<()> {
     let open_api = merge_all_openapi_specs(openapi_specs)?;
 
@@ -125,13 +126,13 @@ pub fn gen(
 
     std::fs::write(
         src.join("api.rs"),
-        rust::lib_gen::lib_gen("crate::api", &api_module_defs),
+        rust::lib_gen::lib_gen("crate::api", &api_module_defs, disable_clippy),
     )
     .unwrap();
 
     std::fs::write(
         src.join("model.rs"),
-        rust::lib_gen::lib_gen("crate::model", &models),
+        rust::lib_gen::lib_gen("crate::model", &models, disable_clippy),
     )
     .unwrap();
 
@@ -145,7 +146,7 @@ pub fn gen(
         errors.def,
     ];
 
-    let lib = rust::lib_gen::lib_gen("crate", &module_defs);
+    let lib = rust::lib_gen::lib_gen("crate", &module_defs, disable_clippy);
     std::fs::write(src.join("lib.rs"), lib).unwrap();
 
     if overwrite_cargo {

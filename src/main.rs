@@ -63,6 +63,7 @@ fn main() {
                 &args.name,
                 &args.client_version,
                 true,
+                false,
             )
             .unwrap();
         }
