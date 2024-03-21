@@ -92,7 +92,7 @@ impl ModuleDef {
     }
 }
 
-pub fn lib_gen(self_name: &str, modules: &[ModuleDef]) -> String {
+pub fn lib_gen(self_name: &str, modules: &[ModuleDef], disable_clippy: bool) -> String {
     let mods = modules
         .iter()
         .map(|m| &m.name)
@@ -108,7 +108,12 @@ pub fn lib_gen(self_name: &str, modules: &[ModuleDef]) -> String {
         .reduce(|acc, e| acc + e)
         .unwrap_or_else(unit);
 
-    let code = line(unit() + "#[allow(clippy::all)]") + NewLine + mods + NewLine + uses;
+    let base = if disable_clippy {
+        line(unit() + "#[allow(clippy::all)]")
+    } else {
+        unit()
+    };
+    let code = base + NewLine + mods + NewLine + uses;
 
     RustContext::new().print_to_string(code)
 }
@@ -133,6 +138,7 @@ mod tests {
                     exports: vec!["A".to_string(), "Y".to_string()],
                 },
             ],
+            true,
         );
 
         let expected = indoc! { r#"
