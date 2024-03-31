@@ -588,7 +588,6 @@ fn unwrap_optional_param(name: &str, setter: RustPrinter) -> RustPrinter {
         line("}")
 }
 
-
 #[rustfmt::skip]
 fn for_param(name: &str, setter: RustPrinter) -> RustPrinter {
     line(unit() + "for " + name + " in " + name + " {") +
@@ -601,7 +600,6 @@ fn for_param(name: &str, setter: RustPrinter) -> RustPrinter {
 fn param_to_str(param: &Param) -> RustResult {
     param_tpe_to_str(&param.original_name, &param.name, &param.tpe)
 }
-
 
 fn param_tpe_to_str(original_name: &str, name: &str, tpe: &DataType) -> RustResult {
     match tpe {
@@ -617,22 +615,20 @@ fn param_tpe_to_str(original_name: &str, name: &str, tpe: &DataType) -> RustResu
     }
 }
 
-
 fn query_setter(param: &Param) -> RustResult {
-    let code =
-        match &param.tpe {
-            DataType::Array(tpe) => {
-                #[rustfmt::skip] let setter =
+    let code = match &param.tpe {
+        DataType::Array(tpe) => {
+            #[rustfmt::skip] let setter =
                     line(unit() + r#"url.query_pairs_mut().append_pair(""# + &param.original_name + r#"", &"# + param_tpe_to_str(&param.original_name, &param.name, tpe)? + ");");
 
-                for_param(&param.name, setter)
-            }
-            _ => {
-                #[rustfmt::skip] let setter =
+            for_param(&param.name, setter)
+        }
+        _ => {
+            #[rustfmt::skip] let setter =
                     line(unit() + r#"url.query_pairs_mut().append_pair(""# + &param.original_name + r#"", &"# + param_to_str(param)? + ");");
-                setter
-            }
-        };
+            setter
+        }
+    };
 
     let code = if param.required {
         code
