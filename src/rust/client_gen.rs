@@ -588,24 +588,47 @@ fn unwrap_optional_param(name: &str, setter: RustPrinter) -> RustPrinter {
         line("}")
 }
 
+#[rustfmt::skip]
+fn for_param(name: &str, setter: RustPrinter) -> RustPrinter {
+    line(unit() + "for " + name + " in " + name + " {") +
+        indented(
+            setter
+        ) +
+        line("}")
+}
+
 fn param_to_str(param: &Param) -> RustResult {
-    match &param.tpe {
-        DataType::String => Ok(unit() + &param.name),
-        DataType::Uuid => Ok(unit() + &param.name + ".to_string()"),
-        DataType::Int(_) => Ok(unit() + &param.name + ".to_string()"),
-        DataType::Boolean => Ok(unit() + &param.name + ".to_string()"),
-        DataType::Model(_) => Ok(unit() + &param.name + ".to_string()"),
+    param_tpe_to_str(&param.original_name, &param.name, &param.tpe)
+}
+
+fn param_tpe_to_str(original_name: &str, name: &str, tpe: &DataType) -> RustResult {
+    match tpe {
+        DataType::String => Ok(unit() + name),
+        DataType::Uuid => Ok(unit() + name + ".to_string()"),
+        DataType::Int(_) => Ok(unit() + name + ".to_string()"),
+        DataType::Boolean => Ok(unit() + name + ".to_string()"),
+        DataType::Model(_) => Ok(unit() + name + ".to_string()"),
         _ => Err(Error::unexpected(format!(
             "Unexpected query param type {}: {:?}",
-            param.original_name, param.tpe
+            original_name, tpe
         ))),
     }
 }
 
 fn query_setter(param: &Param) -> RustResult {
-    #[rustfmt::skip]
-    let code =
-        line(unit() + r#"url.query_pairs_mut().append_pair(""# + &param.original_name + r#"", &"#  + param_to_str(param)? + ");");
+    let code = match &param.tpe {
+        DataType::Array(tpe) => {
+            #[rustfmt::skip] let setter =
+                    line(unit() + r#"url.query_pairs_mut().append_pair(""# + &param.original_name + r#"", &"# + param_tpe_to_str(&param.original_name, &param.name, tpe)? + ");");
+
+            for_param(&param.name, setter)
+        }
+        _ => {
+            #[rustfmt::skip] let setter =
+                    line(unit() + r#"url.query_pairs_mut().append_pair(""# + &param.original_name + r#"", &"# + param_to_str(param)? + ");");
+            setter
+        }
+    };
 
     let code = if param.required {
         code
