@@ -50,6 +50,7 @@ impl RefCache {
 fn serialize() -> RustPrinter {
     rust_name("serde", "Serialize")
 }
+
 fn deserialize() -> RustPrinter {
     rust_name("serde", "Deserialize")
 }
@@ -316,12 +317,14 @@ fn extract_enum_case(
                     data_type: ref_type_name(reference, ref_cache)?,
                 })
             } else {
-                Err(Error::unimplemented(
-                    "Can't find model type reference in enum case schema.",
-                ))
+                Err(Error::unimplemented(&format!(
+                    "Can't find model type reference in enum case schema {schema_name}.",
+                )))
             }
         }
-        _ => Err(Error::unimplemented("allOf schema expected for enum case")),
+        _ => Err(Error::unimplemented(&format!(
+            "allOf schema expected for enum case in {schema_name}"
+        ))),
     }
 }
 
@@ -415,7 +418,7 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                         .unwrap_or_else(unit);
 
                     #[rustfmt::skip]
-                    let code = unit() +
+                        let code = unit() +
                         derive_line() +
                         line(unit() + "pub enum " + &name + " {") +
                         indented(
@@ -423,17 +426,19 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                         ) +
                         line(unit() + "}") +
                         NewLine +
+                        line(unit() + "#[allow(clippy::to_string_trait_impl)]") +
+                        NewLine +
                         line(unit() + "impl ToString for " + &name + "{") +
                         indented(
                             line("fn to_string(&self) -> String {") +
-                            indented(
-                                line("match self {") +
                                 indented(
-                                    match_cases
+                                    line("match self {") +
+                                        indented(
+                                            match_cases
+                                        ) +
+                                        line("}")
                                 ) +
                                 line("}")
-                            ) +
-                            line("}")
                         ) +
                         line("}");
 
