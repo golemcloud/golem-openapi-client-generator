@@ -317,12 +317,12 @@ fn extract_enum_case(
                     data_type: ref_type_name(reference, ref_cache)?,
                 })
             } else {
-                Err(Error::unimplemented(&format!(
+                Err(Error::unimplemented(format!(
                     "Can't find model type reference in enum case schema {schema_name}.",
                 )))
             }
         }
-        _ => Err(Error::unimplemented(&format!(
+        _ => Err(Error::unimplemented(format!(
             "allOf schema expected for enum case in {schema_name}"
         ))),
     }

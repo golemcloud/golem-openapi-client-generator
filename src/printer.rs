@@ -15,6 +15,7 @@
 use std::ops::Add;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct Error;
 
 pub trait Printer<Context> {
