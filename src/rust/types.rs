@@ -42,6 +42,7 @@ pub enum IntFormat {
     I64,
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for IntFormat {
     fn to_string(&self) -> String {
         match self {

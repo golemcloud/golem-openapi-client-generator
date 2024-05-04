@@ -42,6 +42,7 @@ impl RustContext {
     }
 }
 
+#[allow(clippy::to_string_trait_impl)]
 impl ToString for RustContext {
     #[allow(unstable_name_collisions)]
     fn to_string(&self) -> String {
