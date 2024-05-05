@@ -407,7 +407,7 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                     fn make_match_case(enum_name: &str, name: &str) -> RustPrinter {
                         let rust_name = name.to_case(Case::UpperCamel);
 
-                        line(unit() + enum_name + "::" + rust_name + r#" => ""# + name + r#"".to_string(),"#)
+                        line(unit() + enum_name + "::" + rust_name + r#" => write!(f, ""# + name + r#""),"#)
                     }
 
                     let match_cases = string_type
@@ -418,7 +418,7 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                         .unwrap_or_else(unit);
 
                     #[rustfmt::skip]
-                        let code = unit() +
+                    let code = unit() +
                         derive_line() +
                         line(unit() + "pub enum " + &name + " {") +
                         indented(
@@ -426,19 +426,17 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                         ) +
                         line(unit() + "}") +
                         NewLine +
-                        line(unit() + "#[allow(clippy::to_string_trait_impl)]") +
-                        NewLine +
-                        line(unit() + "impl ToString for " + &name + "{") +
+                        line(unit() + "impl " + rust_name("std::fmt", "Display") + " for " + &name + "{") +
                         indented(
-                            line("fn to_string(&self) -> String {") +
+                            line(unit() + "fn fmt(&self, f: &mut " + rust_name("std::fmt", "Formatter") + "<'_>) -> " + rust_name("std::fmt", "Result") + " {") +
+                            indented(
+                                line("match self {") +
                                 indented(
-                                    line("match self {") +
-                                        indented(
-                                            match_cases
-                                        ) +
-                                        line("}")
+                                    match_cases
                                 ) +
                                 line("}")
+                            ) +
+                            line("}")
                         ) +
                         line("}");
 
