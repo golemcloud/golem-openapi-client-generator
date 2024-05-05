@@ -21,6 +21,7 @@ use openapiv3::{
     AdditionalProperties, IntegerFormat, ReferenceOr, Schema, SchemaKind, StringFormat, Type,
     VariantOrUnknownOrEmpty,
 };
+use std::fmt::Display;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModelType {
@@ -42,19 +43,19 @@ pub enum IntFormat {
     I64,
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for IntFormat {
-    fn to_string(&self) -> String {
-        match self {
-            IntFormat::U8 => "u8".to_string(),
-            IntFormat::U16 => "u16".to_string(),
-            IntFormat::U32 => "u32".to_string(),
-            IntFormat::U64 => "u64".to_string(),
-            IntFormat::I8 => "i8".to_string(),
-            IntFormat::I16 => "i16".to_string(),
-            IntFormat::I32 => "i32".to_string(),
-            IntFormat::I64 => "i64".to_string(),
-        }
+impl Display for IntFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let str = match self {
+            IntFormat::U8 => "u8",
+            IntFormat::U16 => "u16",
+            IntFormat::U32 => "u32",
+            IntFormat::U64 => "u64",
+            IntFormat::I8 => "i8",
+            IntFormat::I16 => "i16",
+            IntFormat::I32 => "i32",
+            IntFormat::I64 => "i64",
+        };
+        write!(f, "{}", str)
     }
 }
 

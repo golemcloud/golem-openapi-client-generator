@@ -15,6 +15,7 @@
 use crate::printer::{IndentContext, NewLine, PrintContext, Printer, TreePrinter};
 use itertools::Itertools;
 use std::collections::HashSet;
+use std::fmt::Display;
 use std::ops::Add;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -42,10 +43,9 @@ impl RustContext {
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl ToString for RustContext {
+impl Display for RustContext {
     #[allow(unstable_name_collisions)]
-    fn to_string(&self) -> String {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let RustContext {
             imports,
             code,
@@ -53,7 +53,7 @@ impl ToString for RustContext {
         } = self;
 
         if imports.is_empty() {
-            code.to_string()
+            write!(f, "{}", code)
         } else {
             let imports: String = imports
                 .iter()
@@ -62,7 +62,7 @@ impl ToString for RustContext {
                 .intersperse("\n".to_string())
                 .collect();
 
-            format!("{imports}\n\n{code}")
+            write!(f, "{imports}\n\n{code}")
         }
     }
 }
