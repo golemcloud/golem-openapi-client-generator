@@ -22,6 +22,7 @@ pub fn error_gen() -> Module {
         pub enum Error<T> {
             Item(T),
             Reqwest(reqwest::Error),
+            ReqwestHeader(reqwest::header::InvalidHeaderValue),
             Serde(serde_json::Error),
             Unexpected {
                 code: u16,
@@ -44,6 +45,12 @@ pub fn error_gen() -> Module {
         impl<T> From<serde_json::Error> for Error<T> {
             fn from(value: serde_json::Error) -> Self {
                 Error::Serde(value)
+            }
+        }
+
+        impl<T> From<reqwest::header::InvalidHeaderValue> for Error<T> {
+            fn from(value: reqwest::header::InvalidHeaderValue) -> Self {
+                Error::ReqwestHeader(value)
             }
         }
     "#};
