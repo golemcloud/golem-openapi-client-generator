@@ -745,17 +745,6 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
 
     let no_headers = header_setters.is_empty();
 
-    #[rustfmt::skip]
-    let headers = unit() +
-        line(unit() + "let mut headers = " + rust_name("reqwest::header", "HeaderMap") + "::new();") +
-        NewLine +
-        header_setters.into_iter().map(|l| l + NewLine).reduce(|acc, e| acc + e). unwrap_or_else(unit) +
-        NewLine +
-        line("request = request.headers(headers);") +
-        NewLine;
-
-    let headers = if no_headers { unit() } else { headers };
-
     let headers_vec = if no_headers {
         unit()
     } else {
@@ -791,24 +780,37 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
 
     let endpoint_log = unit() + r#", endpoint=""# + &method.original_path + r#"""#;
 
-    let logs = unit()
-        + line("{")
-        + indented(
-            headers_vec
-                + line(
-                    unit()
-                        + "tracing::info!("
-                        + method_log
-                        + endpoint_log
-                        + ", url=url.to_string()"
-                        + headers_log
-                        + body_log
-                        + r#", ""#
-                        + &method.name
-                        + r#"");"#,
-                ),
-        )
-        + line("}");
+    let logs = headers_vec
+        + line(
+            unit()
+                + "tracing::info!("
+                + method_log
+                + endpoint_log
+                + ", url=url.to_string()"
+                + headers_log
+                + body_log
+                + r#", ""#
+                + &method.name
+                + r#"");"#,
+        );
+
+    #[rustfmt::skip]
+    let headers_and_logs =
+        if no_headers {
+            logs
+        } else {
+            unit() +
+                line(unit() + "let mut headers = " + rust_name("reqwest::header", "HeaderMap") + "::new();") +
+                NewLine +
+                header_setters.into_iter().map(|l| l + NewLine).reduce(|acc, e| acc + e). unwrap_or_else(unit) +
+                NewLine +
+                line("{") +
+                indented(logs) +
+                line("}") +
+                NewLine +
+                line("request = request.headers(headers);") +
+                NewLine
+        };
 
     let body_setter = match body_param {
         None => unit(),
@@ -890,8 +892,7 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
                 line(unit() + "." + &method.http_method + "(url.clone());")
             ) +
             NewLine +
-            headers +
-            logs +
+            headers_and_logs +
             NewLine +
             line("if let Some(token) = self.context.bearer_token() {") +
             indented(
