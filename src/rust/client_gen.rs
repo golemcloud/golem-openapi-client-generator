@@ -334,35 +334,39 @@ fn request_body_params(
                             ReferenceOr::Reference { reference } => Err(Error::unimplemented(
                                 format!("Unexpected ref multipart schema: '{reference}'."),
                             )),
-                            ReferenceOr::Item(schema) => {
-                                match &schema.schema_kind {
-                                    SchemaKind::Type(Type::Object(obj)) => {
-                                        fn multipart_param(
-                                            name: &str,
-                                            schema: &ReferenceOr<Box<Schema>>,
-                                            ref_cache: &mut RefCache,
-                                        ) -> Result<Param> {
-                                            Ok(Param {
-                                                original_name: name.to_string(),
-                                                name: name.to_case(Case::Snake),
-                                                tpe: ref_or_box_schema_type(schema, ref_cache)?,
-                                                required: true, // TODO
-                                                kind: ParamKind::Multipart,
-                                            })
-                                        }
-
-                                        obj.properties
-                                            .iter()
-                                            .map(|(name, schema)| {
-                                                multipart_param(name, schema, ref_cache)
-                                            })
-                                            .collect()
+                            ReferenceOr::Item(schema) => match &schema.schema_kind {
+                                SchemaKind::Type(Type::Object(obj)) => {
+                                    fn multipart_param(
+                                        name: &str,
+                                        required: bool,
+                                        schema: &ReferenceOr<Box<Schema>>,
+                                        ref_cache: &mut RefCache,
+                                    ) -> Result<Param> {
+                                        Ok(Param {
+                                            original_name: name.to_string(),
+                                            name: name.to_case(Case::Snake),
+                                            tpe: ref_or_box_schema_type(schema, ref_cache)?,
+                                            required,
+                                            kind: ParamKind::Multipart,
+                                        })
                                     }
-                                    _ => Err(Error::unimplemented(
-                                        "Object schema expected for multipart request body.",
-                                    )),
+
+                                    obj.properties
+                                        .iter()
+                                        .map(|(name, schema)| {
+                                            multipart_param(
+                                                name,
+                                                body.required && obj.required.contains(name),
+                                                schema,
+                                                ref_cache,
+                                            )
+                                        })
+                                        .collect()
                                 }
-                            }
+                                _ => Err(Error::unimplemented(
+                                    "Object schema expected for multipart request body.",
+                                )),
+                            },
                         },
                     }
                 } else {
@@ -657,14 +661,26 @@ fn header_setter(param: &Param) -> RustResult {
 fn make_part(param: &Param) -> RustResult {
     let part_type = rust_name("reqwest::multipart", "Part");
 
-    if param.tpe == DataType::Binary {
-        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::stream(" + &param.name + r#").mime_str("application/octet-stream")?)"#)
-    } else if param.tpe == DataType::String {
-        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(" + &param.name + r#".to_string()).mime_str("text/plain; charset=utf-8")?)"#)
-    } else if let DataType::Model(_) = param.tpe {
-        Ok(indent() + r#".part(""# + &param.original_name + r#"", "# + part_type + "::text(serde_json::to_string(" + &param.name + r#")?).mime_str("application/json")?)"#)
+    let inner =
+        if param.tpe == DataType::Binary {
+            Ok(indent() + r#"form = form.part(""# + &param.original_name + r#"", "# + part_type + "::stream(" + &param.name + r#").mime_str("application/octet-stream")?);"#)
+        } else if param.tpe == DataType::String {
+            Ok(indent() + r#"form = form.part(""# + &param.original_name + r#"", "# + part_type + "::text(" + &param.name + r#".to_string()).mime_str("text/plain; charset=utf-8")?);"#)
+        }
+        else if let DataType::Model(_) = param.tpe {
+            Ok(indent() + r#"form = form.part(""# + &param.original_name + r#"", "# + part_type + "::text(crate::model::MultipartField::to_multipart_field(" + &param.name + r#")).mime_str(crate::model::MultipartField::mime_type("# + &param.name + r#"))?);"#)
+        } else {
+            Err(Error::unimplemented(format!("Unsupported multipart part type {:?}", param.tpe)))
+        };
+
+    if param.required {
+        inner
     } else {
-        Err(Error::unimplemented(format!("Unsupported multipart part type {:?}", param.tpe)))
+        Ok(
+            indent() + line(unit() + r#"if let Some("# + &param.name + r#") = "# + &param.name + " {") +
+                indented(inner?) +
+            line("}")
+        )
     }
 }
 
@@ -837,10 +853,8 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
     let multipart_setter = if is_multipart {
         #[rustfmt::skip]
         let code = unit() +
-            indent() + "let form = " + rust_name("reqwest::multipart", "Form") + "::new()" +
-            indented(
-                multipart_parts?.into_iter().map(|p| unit() + NewLine + p).reduce(|acc, e| acc + e). unwrap_or_else(unit) + ";" + NewLine
-            ) +
+            indent() + "let mut form = " + rust_name("reqwest::multipart", "Form") + "::new();" +
+            (multipart_parts?.into_iter().map(|p| unit() + NewLine + p).reduce(|acc, e| acc + e). unwrap_or_else(unit) + NewLine) +
             NewLine +
             line("request = request.multipart(form);");
 
