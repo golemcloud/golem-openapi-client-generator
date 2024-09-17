@@ -99,6 +99,14 @@ pub fn gen(
     let mut known_refs = RefCache::new();
     let mut models = Vec::new();
 
+    let multipart_field_file = rust::model_gen::multipart_field_module()?;
+    std::fs::write(
+        model.join(multipart_field_file.def.name.file_name()),
+        multipart_field_file.code,
+    )
+    .unwrap();
+    models.push(multipart_field_file.def);
+
     while !ref_cache.is_empty() {
         let mut next_ref_cache = RefCache::new();
 

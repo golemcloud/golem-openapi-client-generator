@@ -348,6 +348,25 @@ fn extract_enum_cases(
         .collect()
 }
 
+pub fn multipart_field_module() -> Result<Module> {
+    let code = unit()
+        + line(unit() + "pub trait MultipartField {")
+        + indented(
+            unit()
+                + line("fn to_multipart_field(&self) -> String;")
+                + line("fn mime_type(&self) -> &'static str;"),
+        )
+        + line(unit() + "}");
+
+    Ok(Module {
+        def: ModuleDef {
+            name: ModuleName::new("multipart_field"),
+            exports: vec!["MultipartField".to_string()],
+        },
+        code: RustContext::new().print_to_string(code),
+    })
+}
+
 pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) -> Result<Module> {
     let schemas = &open_api
         .components
@@ -437,6 +456,22 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                                 line("}")
                             ) +
                             line("}")
+                        ) +
+                        line("}") +
+                        NewLine +
+                        line(unit() + "impl " + rust_name("crate::model", "MultipartField") + " for " + &name + "{") +
+                        indented(
+                            line(unit() + "fn to_multipart_field(&self) -> String {") +
+                                indented(
+                                    line("self.to_string()")
+                                ) +
+                                line("}") +
+                                NewLine +
+                                line(unit() + "fn mime_type(&self) -> &'static str {") +
+                                indented(
+                                    line(r#""text/plain; charset=utf-8""#)
+                                ) +
+                                line("}")
                         ) +
                         line("}");
 
