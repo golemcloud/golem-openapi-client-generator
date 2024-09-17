@@ -659,8 +659,6 @@ fn header_setter(param: &Param) -> RustResult {
 
 #[rustfmt::skip]
 fn make_part(param: &Param) -> RustResult {
-    println!("cargo:warning=make_part {:?}", param);
-
     let part_type = rust_name("reqwest::multipart", "Part");
 
     let inner =
