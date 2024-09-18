@@ -527,7 +527,26 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
                             .reduce(|acc, e| acc + e)
                             .unwrap_or_else(unit),
                     )
-                    + line(unit() + "}");
+                    + line(unit() + "}")
+                    + NewLine
+                    + line(
+                        unit()
+                            + "impl "
+                            + rust_name("crate::model", "MultipartField")
+                            + " for "
+                            + &name
+                            + "{",
+                    )
+                    + indented(
+                        line(unit() + "fn to_multipart_field(&self) -> String {")
+                            + indented(line("serde_json::to_string(self).unwrap()"))
+                            + line("}")
+                            + NewLine
+                            + line(unit() + "fn mime_type(&self) -> &'static str {")
+                            + indented(line(r#""application/json""#))
+                            + line("}"),
+                    )
+                    + line("}");
 
                 Ok(code)
             }
