@@ -56,25 +56,11 @@ fn deserialize() -> RustPrinter {
 }
 
 fn derive_line() -> RustPrinter {
-    line(
-        unit()
-            + "#[derive(Debug, Clone, PartialEq, "
-            + serialize()
-            + ", "
-            + deserialize()
-            + ")]",
-    )
+    line(unit() + "#[derive(Debug, Clone, PartialEq, " + serialize() + ", " + deserialize() + ")]")
 }
 
 fn derive_line_simple() -> RustPrinter {
-    line(
-        unit()
-            + "#[derive(Debug, Clone, PartialEq, "
-            + serialize()
-            + ", "
-            + deserialize()
-            + ")]",
-    )
+    line(unit() + "#[derive(Debug, Clone, PartialEq, " + serialize() + ", " + deserialize() + ")]")
 }
 
 fn rename_line(to: &str) -> RustPrinter {
@@ -356,7 +342,20 @@ pub fn multipart_field_module() -> Result<Module> {
                 + line("fn to_multipart_field(&self) -> String;")
                 + line("fn mime_type(&self) -> &'static str;"),
         )
-        + line(unit() + "}");
+        + line(unit() + "}")
+        + NewLine
+        + line(unit() + "impl<T: Display> MultipartField for T {")
+        + indented(
+            unit()
+                + line("fn to_multipart_field(&self) -> String {")
+                + indented(line("self.to_string()"))
+                + line("}")
+                + NewLine
+                + line(unit() + "fn mime_type(&self) -> &'static str {")
+                + indented(line(r#""""text/plain; charset=utf-8""""#))
+                + line(unit() + "}"),
+        )
+        + line("}");
 
     Ok(Module {
         def: ModuleDef {
@@ -464,22 +463,6 @@ pub fn model_gen(
                                     line("}")
                                 ) +
                                 line("}")
-                            ) +
-                            line("}") +
-                            NewLine +
-                            line(unit() + "impl " + rust_name("crate::model", "MultipartField") + " for " + &name + "{") +
-                            indented(
-                                line(unit() + "fn to_multipart_field(&self) -> String {") +
-                                    indented(
-                                        line("self.to_string()")
-                                    ) +
-                                    line("}") +
-                                    NewLine +
-                                    line(unit() + "fn mime_type(&self) -> &'static str {") +
-                                    indented(
-                                        line(r#""text/plain; charset=utf-8""#)
-                                    ) +
-                                    line("}")
                             ) +
                             line("}");
 
