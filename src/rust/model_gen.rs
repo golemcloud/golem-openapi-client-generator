@@ -69,7 +69,7 @@ fn derive_line() -> RustPrinter {
 fn derive_line_simple() -> RustPrinter {
     line(
         unit()
-            + "#[derive(Debug, Clone, PartialEq, Eq, "
+            + "#[derive(Debug, Clone, PartialEq, "
             + serialize()
             + ", "
             + deserialize()
