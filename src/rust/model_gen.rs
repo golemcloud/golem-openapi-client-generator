@@ -352,7 +352,7 @@ pub fn multipart_field_module() -> Result<Module> {
                 + line("}")
                 + NewLine
                 + line(unit() + "fn mime_type(&self) -> &'static str {")
-                + indented(line(r#""""text/plain; charset=utf-8""""#))
+                + indented(line(r#""text/plain; charset=utf-8""#))
                 + line(unit() + "}"),
         )
         + line("}");
