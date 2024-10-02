@@ -24,7 +24,7 @@ use convert_case::{Case, Casing};
 use openapiv3::{
     AnySchema, Discriminator, OpenAPI, ReferenceOr, Schema, SchemaData, SchemaKind, Type,
 };
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct RefCache {
@@ -367,7 +367,12 @@ pub fn multipart_field_module() -> Result<Module> {
     })
 }
 
-pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) -> Result<Module> {
+pub fn model_gen(
+    reference: &str,
+    open_api: &OpenAPI,
+    mapping: &HashMap<&str, &str>,
+    ref_cache: &mut RefCache,
+) -> Result<Module> {
     let schemas = &open_api
         .components
         .as_ref()
@@ -391,191 +396,208 @@ pub fn model_gen(reference: &str, open_api: &OpenAPI, ref_cache: &mut RefCache) 
         "Direct cross reference in {reference}"
     )))?;
 
-    let code = match &schema.schema_kind {
-        SchemaKind::Type(tpe) => match tpe {
-            Type::String(string_type) => {
-                if string_type.enumeration.is_empty() {
-                    Err(Error::unimplemented(format!(
-                        "String schema without enum {reference}"
-                    )))
-                } else if string_type.enumeration.contains(&None) {
-                    Err(Error::unimplemented(format!(
-                        "String schema enum with empty string {reference}"
-                    )))
-                } else {
-                    fn make_case(name: &str) -> RustPrinter {
-                        let rust_name = name.to_case(Case::UpperCamel);
+    let code = if let Some(mapped_type) = mapping.get(name.as_str()) {
+        Ok(unit() + line(unit() + "pub type " + &name + " = " + *mapped_type + ";"))
+    } else {
+        match &schema.schema_kind {
+            SchemaKind::Type(tpe) => match tpe {
+                Type::String(string_type) => {
+                    if string_type.enumeration.is_empty() {
+                        Err(Error::unimplemented(format!(
+                            "String schema without enum {reference}"
+                        )))
+                    } else if string_type.enumeration.contains(&None) {
+                        Err(Error::unimplemented(format!(
+                            "String schema enum with empty string {reference}"
+                        )))
+                    } else {
+                        fn make_case(name: &str) -> RustPrinter {
+                            let rust_name = name.to_case(Case::UpperCamel);
 
-                        let rename = if name == rust_name {
+                            let rename = if name == rust_name {
+                                unit()
+                            } else {
+                                rename_line(name)
+                            };
+
+                            rename + line(unit() + rust_name + ",")
+                        }
+
+                        let cases = string_type
+                            .enumeration
+                            .iter()
+                            .map(|n| make_case(n.as_ref().unwrap()))
+                            .reduce(|acc, e| acc + e)
+                            .unwrap_or_else(unit);
+
+                        #[rustfmt::skip]
+                        fn make_match_case(enum_name: &str, name: &str) -> RustPrinter {
+                            let rust_name = name.to_case(Case::UpperCamel);
+
+                            line(unit() + enum_name + "::" + rust_name + r#" => write!(f, ""# + name + r#""),"#)
+                        }
+
+                        let match_cases = string_type
+                            .enumeration
+                            .iter()
+                            .map(|n| make_match_case(&name, n.as_ref().unwrap()))
+                            .reduce(|acc, e| acc + e)
+                            .unwrap_or_else(unit);
+
+                        #[rustfmt::skip]
+                        let code = unit() +
+                            derive_line() +
+                            line(unit() + "pub enum " + &name + " {") +
+                            indented(
+                                cases
+                            ) +
+                            line(unit() + "}") +
+                            NewLine +
+                            line(unit() + "impl " + rust_name("std::fmt", "Display") + " for " + &name + "{") +
+                            indented(
+                                line(unit() + "fn fmt(&self, f: &mut " + rust_name("std::fmt", "Formatter") + "<'_>) -> " + rust_name("std::fmt", "Result") + " {") +
+                                indented(
+                                    line("match self {") +
+                                    indented(
+                                        match_cases
+                                    ) +
+                                    line("}")
+                                ) +
+                                line("}")
+                            ) +
+                            line("}") +
+                            NewLine +
+                            line(unit() + "impl " + rust_name("crate::model", "MultipartField") + " for " + &name + "{") +
+                            indented(
+                                line(unit() + "fn to_multipart_field(&self) -> String {") +
+                                    indented(
+                                        line("self.to_string()")
+                                    ) +
+                                    line("}") +
+                                    NewLine +
+                                    line(unit() + "fn mime_type(&self) -> &'static str {") +
+                                    indented(
+                                        line(r#""text/plain; charset=utf-8""#)
+                                    ) +
+                                    line("}")
+                            ) +
+                            line("}");
+
+                        Ok(code)
+                    }
+                }
+                Type::Number(_) => Err(Error::unimplemented(format!("Number schema {reference}"))),
+                Type::Integer(_) => {
+                    Err(Error::unimplemented(format!("Integer schema {reference}")))
+                }
+                Type::Boolean(_) => {
+                    Err(Error::unimplemented(format!("Boolean schema {reference}")))
+                }
+                Type::Array(_) => Err(Error::unimplemented(format!("Array schema {reference}"))),
+                Type::Object(obj) => {
+                    let required: HashSet<String> =
+                        obj.required.iter().map(|s| s.to_owned()).collect();
+
+                    fn make_field(
+                        name: &str,
+                        schema: &ReferenceOr<Box<Schema>>,
+                        required: &HashSet<String>,
+                        ref_cache: &mut RefCache,
+                    ) -> RustResult {
+                        let rust_name = name.to_case(Case::Snake);
+
+                        let rename = if rust_name == name {
                             unit()
                         } else {
                             rename_line(name)
                         };
 
-                        rename + line(unit() + rust_name + ",")
+                        let tpe =
+                            ref_or_box_schema_type(schema, ref_cache)?.render_declaration(false);
+
+                        let tpe = if required.contains(name) {
+                            tpe
+                        } else {
+                            unit() + "Option<" + tpe + ">"
+                        };
+
+                        Ok(rename + line(unit() + "pub " + rust_name + ": " + tpe + ","))
                     }
 
-                    let cases = string_type
-                        .enumeration
+                    let fields: Result<Vec<RustPrinter>> = obj
+                        .properties
                         .iter()
-                        .map(|n| make_case(n.as_ref().unwrap()))
-                        .reduce(|acc, e| acc + e)
-                        .unwrap_or_else(unit);
+                        .map(|(name, schema)| make_field(name, schema, &required, ref_cache))
+                        .collect();
 
-                    #[rustfmt::skip]
-                    fn make_match_case(enum_name: &str, name: &str) -> RustPrinter {
-                        let rust_name = name.to_case(Case::UpperCamel);
+                    let fields =
+                        fields.map_err(|e| e.extend(format!("In reference {reference}.")))?;
 
-                        line(unit() + enum_name + "::" + rust_name + r#" => write!(f, ""# + name + r#""),"#)
-                    }
-
-                    let match_cases = string_type
-                        .enumeration
-                        .iter()
-                        .map(|n| make_match_case(&name, n.as_ref().unwrap()))
-                        .reduce(|acc, e| acc + e)
-                        .unwrap_or_else(unit);
-
-                    #[rustfmt::skip]
-                    let code = unit() +
-                        derive_line() +
-                        line(unit() + "pub enum " + &name + " {") +
-                        indented(
-                            cases
-                        ) +
-                        line(unit() + "}") +
-                        NewLine +
-                        line(unit() + "impl " + rust_name("std::fmt", "Display") + " for " + &name + "{") +
-                        indented(
-                            line(unit() + "fn fmt(&self, f: &mut " + rust_name("std::fmt", "Formatter") + "<'_>) -> " + rust_name("std::fmt", "Result") + " {") +
-                            indented(
-                                line("match self {") +
-                                indented(
-                                    match_cases
-                                ) +
-                                line("}")
-                            ) +
-                            line("}")
-                        ) +
-                        line("}") +
-                        NewLine +
-                        line(unit() + "impl " + rust_name("crate::model", "MultipartField") + " for " + &name + "{") +
-                        indented(
-                            line(unit() + "fn to_multipart_field(&self) -> String {") +
-                                indented(
-                                    line("self.to_string()")
-                                ) +
-                                line("}") +
-                                NewLine +
-                                line(unit() + "fn mime_type(&self) -> &'static str {") +
-                                indented(
-                                    line(r#""text/plain; charset=utf-8""#)
-                                ) +
-                                line("}")
-                        ) +
-                        line("}");
+                    let code = unit()
+                        + derive_line()
+                        + line(unit() + "pub struct " + &name + " {")
+                        + indented(
+                            fields
+                                .into_iter()
+                                .reduce(|acc, e| acc + e)
+                                .unwrap_or_else(unit),
+                        )
+                        + line(unit() + "}")
+                        + NewLine
+                        + line(
+                            unit()
+                                + "impl "
+                                + rust_name("crate::model", "MultipartField")
+                                + " for "
+                                + &name
+                                + "{",
+                        )
+                        + indented(
+                            line(unit() + "fn to_multipart_field(&self) -> String {")
+                                + indented(line("serde_json::to_string(self).unwrap()"))
+                                + line("}")
+                                + NewLine
+                                + line(unit() + "fn mime_type(&self) -> &'static str {")
+                                + indented(line(r#""application/json""#))
+                                + line("}"),
+                        )
+                        + line("}");
 
                     Ok(code)
                 }
+            },
+            SchemaKind::OneOf { .. } => {
+                Err(Error::unimplemented(format!("OneOf schema {reference}")))
             }
-            Type::Number(_) => Err(Error::unimplemented(format!("Number schema {reference}"))),
-            Type::Integer(_) => Err(Error::unimplemented(format!("Integer schema {reference}"))),
-            Type::Boolean(_) => Err(Error::unimplemented(format!("Boolean schema {reference}"))),
-            Type::Array(_) => Err(Error::unimplemented(format!("Array schema {reference}"))),
-            Type::Object(obj) => {
-                let required: HashSet<String> = obj.required.iter().map(|s| s.to_owned()).collect();
+            SchemaKind::AllOf { .. } => {
+                Err(Error::unimplemented(format!("AllOf schema {reference}")))
+            }
+            SchemaKind::AnyOf { .. } => {
+                Err(Error::unimplemented(format!("AnyOf schema {reference}")))
+            }
+            SchemaKind::Not { .. } => Err(Error::unimplemented(format!("Not schema {reference}"))),
+            SchemaKind::Any(any) => {
+                enum_schema_sanity_check(any, &schema.schema_data)?;
 
-                fn make_field(
-                    name: &str,
-                    schema: &ReferenceOr<Box<Schema>>,
-                    required: &HashSet<String>,
-                    ref_cache: &mut RefCache,
-                ) -> RustResult {
-                    let rust_name = name.to_case(Case::Snake);
+                let discriminator = schema.schema_data.discriminator.as_ref().unwrap();
 
-                    let rename = if rust_name == name {
-                        unit()
-                    } else {
-                        rename_line(name)
-                    };
+                let cases = extract_enum_cases(open_api, discriminator, ref_cache);
 
-                    let tpe = ref_or_box_schema_type(schema, ref_cache)?.render_declaration(false);
-
-                    let tpe = if required.contains(name) {
-                        tpe
-                    } else {
-                        unit() + "Option<" + tpe + ">"
-                    };
-
-                    Ok(rename + line(unit() + "pub " + rust_name + ": " + tpe + ","))
-                }
-
-                let fields: Result<Vec<RustPrinter>> = obj
-                    .properties
+                let cases = cases?
                     .iter()
-                    .map(|(name, schema)| make_field(name, schema, &required, ref_cache))
-                    .collect();
-
-                let fields = fields.map_err(|e| e.extend(format!("In reference {reference}.")))?;
+                    .map(|c| c.render(reference, open_api))
+                    .reduce(|acc, e| acc + e)
+                    .unwrap_or_else(unit);
 
                 let code = unit()
-                    + derive_line()
-                    + line(unit() + "pub struct " + &name + " {")
-                    + indented(
-                        fields
-                            .into_iter()
-                            .reduce(|acc, e| acc + e)
-                            .unwrap_or_else(unit),
-                    )
-                    + line(unit() + "}")
-                    + NewLine
-                    + line(
-                        unit()
-                            + "impl "
-                            + rust_name("crate::model", "MultipartField")
-                            + " for "
-                            + &name
-                            + "{",
-                    )
-                    + indented(
-                        line(unit() + "fn to_multipart_field(&self) -> String {")
-                            + indented(line("serde_json::to_string(self).unwrap()"))
-                            + line("}")
-                            + NewLine
-                            + line(unit() + "fn mime_type(&self) -> &'static str {")
-                            + indented(line(r#""application/json""#))
-                            + line("}"),
-                    )
-                    + line("}");
+                    + derive_line_simple()
+                    + line(unit() + r#"#[serde(tag = ""# + &discriminator.property_name + r#"")]"#)
+                    + line(unit() + "pub enum " + &name + " {")
+                    + indented(cases)
+                    + line(unit() + "}");
 
                 Ok(code)
             }
-        },
-        SchemaKind::OneOf { .. } => Err(Error::unimplemented(format!("OneOf schema {reference}"))),
-        SchemaKind::AllOf { .. } => Err(Error::unimplemented(format!("AllOf schema {reference}"))),
-        SchemaKind::AnyOf { .. } => Err(Error::unimplemented(format!("AnyOf schema {reference}"))),
-        SchemaKind::Not { .. } => Err(Error::unimplemented(format!("Not schema {reference}"))),
-        SchemaKind::Any(any) => {
-            enum_schema_sanity_check(any, &schema.schema_data)?;
-
-            let discriminator = schema.schema_data.discriminator.as_ref().unwrap();
-
-            let cases = extract_enum_cases(open_api, discriminator, ref_cache);
-
-            let cases = cases?
-                .iter()
-                .map(|c| c.render(reference, open_api))
-                .reduce(|acc, e| acc + e)
-                .unwrap_or_else(unit);
-
-            let code = unit()
-                + derive_line_simple()
-                + line(unit() + r#"#[serde(tag = ""# + &discriminator.property_name + r#"")]"#)
-                + line(unit() + "pub enum " + &name + " {")
-                + indented(cases)
-                + line(unit() + "}");
-
-            Ok(code)
         }
     };
 

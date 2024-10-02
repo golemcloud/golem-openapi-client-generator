@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -68,7 +69,10 @@ pub fn gen(
     version: &str,
     overwrite_cargo: bool,
     disable_clippy: bool,
+    mapping: &[(&str, &str)],
 ) -> Result<()> {
+    let mapping: HashMap<&str, &str> = HashMap::from_iter(mapping.iter().cloned());
+
     let open_api = merge_all_openapi_specs(openapi_specs)?;
 
     let src = target.join("src");
@@ -113,7 +117,7 @@ pub fn gen(
         for ref_str in ref_cache.refs {
             if !known_refs.refs.contains(&ref_str) {
                 let model_file =
-                    rust::model_gen::model_gen(&ref_str, &open_api, &mut next_ref_cache)?;
+                    rust::model_gen::model_gen(&ref_str, &open_api, &mapping, &mut next_ref_cache)?;
                 std::fs::write(model.join(model_file.def.name.file_name()), model_file.code)
                     .unwrap();
                 models.push(model_file.def);
