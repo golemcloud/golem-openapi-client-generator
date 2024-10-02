@@ -344,7 +344,7 @@ pub fn multipart_field_module() -> Result<Module> {
         )
         + line(unit() + "}")
         + NewLine
-        + line(unit() + "impl<T: Display> MultipartField for T {")
+        + line(unit() + "impl<T: std::fmt::Display> MultipartField for T {")
         + indented(
             unit()
                 + line("fn to_multipart_field(&self) -> String {")
