@@ -64,6 +64,7 @@ fn main() {
                 &args.client_version,
                 true,
                 false,
+                &[],
             )
             .unwrap();
         }
