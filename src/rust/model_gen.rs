@@ -385,7 +385,8 @@ pub fn model_gen(
                 "Unexpected reference format: {reference}."
             )))?;
 
-    let name = original_name.to_case(Case::UpperCamel);
+    let mod_name = ModuleName::new(original_name);
+    let name = mod_name.name().to_case(Case::UpperCamel);
 
     let schema = schemas.get(original_name).ok_or(Error::unexpected(format!(
         "Can't find schema by reference {original_name}"
@@ -584,10 +585,11 @@ pub fn model_gen(
         }
     };
 
+    let name = ModuleName::new(name);
     Ok(Module {
         def: ModuleDef {
-            name: ModuleName::new(name.to_case(Case::Snake)),
-            exports: vec![name],
+            name: name.clone(),
+            exports: vec![name.name().to_case(Case::Pascal)],
         },
         code: RustContext::new().print_to_string(code?),
     })

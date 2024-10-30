@@ -15,6 +15,7 @@
 use crate::printer::*;
 use crate::rust::printer::*;
 use crate::rust::types::{escape_keywords, RustPrinter};
+use convert_case::{Case, Casing};
 use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -39,26 +40,37 @@ pub struct ModuleName {
 }
 
 impl ModuleName {
+    pub fn name(&self) -> String {
+        self.name.clone()
+    }
+
     fn code(&self) -> RustPrinter {
         line(unit() + self.verbosity.render() + "mod " + escape_keywords(&self.name) + ";")
     }
 
-    pub fn new<S: Into<String>>(s: S) -> ModuleName {
+    pub fn new(s: impl AsRef<str>) -> ModuleName {
         ModuleName {
-            name: s.into(),
+            name: Self::escape_type_params(s.as_ref()).to_case(Case::Snake),
             verbosity: Verbosity::Default,
         }
     }
 
-    pub fn new_pub<S: Into<String>>(s: S) -> ModuleName {
+    pub fn new_pub(s: impl AsRef<str>) -> ModuleName {
         ModuleName {
-            name: s.into(),
+            name: Self::escape_type_params(s.as_ref()).to_case(Case::Snake),
             verbosity: Verbosity::Pub,
         }
     }
 
     pub fn file_name(&self) -> String {
         format!("{}.rs", &self.name)
+    }
+
+    fn escape_type_params(s: &str) -> String {
+        s.replace("<", "_")
+            .replace(",", "_")
+            .replace(">", "_")
+            .replace(" ", "")
     }
 }
 

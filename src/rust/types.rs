@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::printer::TreePrinter;
+use crate::rust::lib_gen::ModuleName;
 use crate::rust::model_gen::RefCache;
 use crate::rust::printer::{rust_name, unit, RustContext};
 use crate::{Error, Result};
@@ -120,7 +121,8 @@ impl DataType {
                 }
             }
             DataType::Model(ModelType { name }) => {
-                let model_type = rust_name("crate::model", name);
+                let name = ModuleName::new(name);
+                let model_type = rust_name("crate::model", &name.name().to_case(Case::Pascal));
                 to_ref(model_type, top_param)
             }
             DataType::Array(item) => {
