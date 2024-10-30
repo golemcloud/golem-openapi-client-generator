@@ -338,23 +338,23 @@ pub fn multipart_field_module() -> Result<Module> {
     let code = unit()
         + line(unit() + "pub trait MultipartField {")
         + indented(
-            unit()
-                + line("fn to_multipart_field(&self) -> String;")
-                + line("fn mime_type(&self) -> &'static str;"),
-        )
+        unit()
+            + line("fn to_multipart_field(&self) -> String;")
+            + line("fn mime_type(&self) -> &'static str;"),
+    )
         + line(unit() + "}")
         + NewLine
         + line(unit() + "impl<T: std::fmt::Display> MultipartField for T {")
         + indented(
-            unit()
-                + line("fn to_multipart_field(&self) -> String {")
-                + indented(line("self.to_string()"))
-                + line("}")
-                + NewLine
-                + line(unit() + "fn mime_type(&self) -> &'static str {")
-                + indented(line(r#""text/plain; charset=utf-8""#))
-                + line(unit() + "}"),
-        )
+        unit()
+            + line("fn to_multipart_field(&self) -> String {")
+            + indented(line("self.to_string()"))
+            + line("}")
+            + NewLine
+            + line(unit() + "fn mime_type(&self) -> &'static str {")
+            + indented(line(r#""text/plain; charset=utf-8""#))
+            + line(unit() + "}"),
+    )
         + line("}");
 
     Ok(Module {
@@ -385,7 +385,8 @@ pub fn model_gen(
                 "Unexpected reference format: {reference}."
             )))?;
 
-    let name = original_name.to_case(Case::UpperCamel);
+    let mod_name = ModuleName::new(original_name);
+    let name = mod_name.name().to_case(Case::UpperCamel);
 
     let schema = schemas.get(original_name).ok_or(Error::unexpected(format!(
         "Can't find schema by reference {original_name}"
@@ -520,30 +521,30 @@ pub fn model_gen(
                         + derive_line()
                         + line(unit() + "pub struct " + &name + " {")
                         + indented(
-                            fields
-                                .into_iter()
-                                .reduce(|acc, e| acc + e)
-                                .unwrap_or_else(unit),
-                        )
+                        fields
+                            .into_iter()
+                            .reduce(|acc, e| acc + e)
+                            .unwrap_or_else(unit),
+                    )
                         + line(unit() + "}")
                         + NewLine
                         + line(
-                            unit()
-                                + "impl "
-                                + rust_name("crate::model", "MultipartField")
-                                + " for "
-                                + &name
-                                + "{",
-                        )
+                        unit()
+                            + "impl "
+                            + rust_name("crate::model", "MultipartField")
+                            + " for "
+                            + &name
+                            + "{",
+                    )
                         + indented(
-                            line(unit() + "fn to_multipart_field(&self) -> String {")
-                                + indented(line("serde_json::to_string(self).unwrap()"))
-                                + line("}")
-                                + NewLine
-                                + line(unit() + "fn mime_type(&self) -> &'static str {")
-                                + indented(line(r#""application/json""#))
-                                + line("}"),
-                        )
+                        line(unit() + "fn to_multipart_field(&self) -> String {")
+                            + indented(line("serde_json::to_string(self).unwrap()"))
+                            + line("}")
+                            + NewLine
+                            + line(unit() + "fn mime_type(&self) -> &'static str {")
+                            + indented(line(r#""application/json""#))
+                            + line("}"),
+                    )
                         + line("}");
 
                     Ok(code)
@@ -584,10 +585,11 @@ pub fn model_gen(
         }
     };
 
+    let name = ModuleName::new(name);
     Ok(Module {
         def: ModuleDef {
-            name: ModuleName::new(name.to_case(Case::Snake)),
-            exports: vec![name],
+            name: name.clone(),
+            exports: vec![name.name().to_case(Case::Pascal)],
         },
         code: RustContext::new().print_to_string(code?),
     })

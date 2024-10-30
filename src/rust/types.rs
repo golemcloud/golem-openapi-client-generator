@@ -22,6 +22,7 @@ use openapiv3::{
     VariantOrUnknownOrEmpty,
 };
 use std::fmt::Display;
+use crate::rust::lib_gen::ModuleName;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModelType {
@@ -120,7 +121,8 @@ impl DataType {
                 }
             }
             DataType::Model(ModelType { name }) => {
-                let model_type = rust_name("crate::model", name);
+                let name = ModuleName::new(name);
+                let model_type = rust_name("crate::model", &name.name().to_case(Case::Pascal));
                 to_ref(model_type, top_param)
             }
             DataType::Array(item) => {
