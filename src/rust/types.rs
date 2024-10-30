@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::printer::TreePrinter;
+use crate::rust::lib_gen::ModuleName;
 use crate::rust::model_gen::RefCache;
 use crate::rust::printer::{rust_name, unit, RustContext};
 use crate::{Error, Result};
@@ -22,7 +23,6 @@ use openapiv3::{
     VariantOrUnknownOrEmpty,
 };
 use std::fmt::Display;
-use crate::rust::lib_gen::ModuleName;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModelType {

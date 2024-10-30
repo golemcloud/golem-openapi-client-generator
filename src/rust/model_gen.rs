@@ -338,23 +338,23 @@ pub fn multipart_field_module() -> Result<Module> {
     let code = unit()
         + line(unit() + "pub trait MultipartField {")
         + indented(
-        unit()
-            + line("fn to_multipart_field(&self) -> String;")
-            + line("fn mime_type(&self) -> &'static str;"),
-    )
+            unit()
+                + line("fn to_multipart_field(&self) -> String;")
+                + line("fn mime_type(&self) -> &'static str;"),
+        )
         + line(unit() + "}")
         + NewLine
         + line(unit() + "impl<T: std::fmt::Display> MultipartField for T {")
         + indented(
-        unit()
-            + line("fn to_multipart_field(&self) -> String {")
-            + indented(line("self.to_string()"))
-            + line("}")
-            + NewLine
-            + line(unit() + "fn mime_type(&self) -> &'static str {")
-            + indented(line(r#""text/plain; charset=utf-8""#))
-            + line(unit() + "}"),
-    )
+            unit()
+                + line("fn to_multipart_field(&self) -> String {")
+                + indented(line("self.to_string()"))
+                + line("}")
+                + NewLine
+                + line(unit() + "fn mime_type(&self) -> &'static str {")
+                + indented(line(r#""text/plain; charset=utf-8""#))
+                + line(unit() + "}"),
+        )
         + line("}");
 
     Ok(Module {
@@ -521,30 +521,30 @@ pub fn model_gen(
                         + derive_line()
                         + line(unit() + "pub struct " + &name + " {")
                         + indented(
-                        fields
-                            .into_iter()
-                            .reduce(|acc, e| acc + e)
-                            .unwrap_or_else(unit),
-                    )
+                            fields
+                                .into_iter()
+                                .reduce(|acc, e| acc + e)
+                                .unwrap_or_else(unit),
+                        )
                         + line(unit() + "}")
                         + NewLine
                         + line(
-                        unit()
-                            + "impl "
-                            + rust_name("crate::model", "MultipartField")
-                            + " for "
-                            + &name
-                            + "{",
-                    )
+                            unit()
+                                + "impl "
+                                + rust_name("crate::model", "MultipartField")
+                                + " for "
+                                + &name
+                                + "{",
+                        )
                         + indented(
-                        line(unit() + "fn to_multipart_field(&self) -> String {")
-                            + indented(line("serde_json::to_string(self).unwrap()"))
-                            + line("}")
-                            + NewLine
-                            + line(unit() + "fn mime_type(&self) -> &'static str {")
-                            + indented(line(r#""application/json""#))
-                            + line("}"),
-                    )
+                            line(unit() + "fn to_multipart_field(&self) -> String {")
+                                + indented(line("serde_json::to_string(self).unwrap()"))
+                                + line("}")
+                                + NewLine
+                                + line(unit() + "fn mime_type(&self) -> &'static str {")
+                                + indented(line(r#""application/json""#))
+                                + line("}"),
+                        )
                         + line("}");
 
                     Ok(code)
