@@ -142,11 +142,11 @@ mod tests {
             "lib",
             &[
                 ModuleDef {
-                    name: ModuleName::new("abc".to_string()),
+                    name: ModuleName::new("abc"),
                     exports: vec!["C".to_string(), "B".to_string()],
                 },
                 ModuleDef {
-                    name: ModuleName::new("xyz".to_string()),
+                    name: ModuleName::new("xyz"),
                     exports: vec!["A".to_string(), "Y".to_string()],
                 },
             ],

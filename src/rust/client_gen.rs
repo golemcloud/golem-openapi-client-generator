@@ -192,11 +192,11 @@ pub struct RequestBodyParams {
 }
 
 impl RequestBodyParams {
-    pub fn has_single_content_type(&self) -> bool {
+    fn has_single_content_type(&self) -> bool {
         self.params.len() == 1
     }
 
-    pub fn get_default_request_body_param(&self) -> Option<&Vec<Param>> {
+    fn get_default_request_body_param(&self) -> Option<&Vec<Param>> {
         self.params
             .values()
             .next()
