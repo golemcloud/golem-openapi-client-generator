@@ -73,6 +73,7 @@ pub enum DataType {
     Array(Box<DataType>),
     MapOf(Box<DataType>),
     Json,
+    Yaml
 }
 
 pub fn escape_keywords(name: &str) -> String {
@@ -143,6 +144,11 @@ impl DataType {
                 let res = rust_name("serde_json::value", "Value");
                 to_ref(res, top_param)
             }
+
+            DataType::Yaml => {
+                let res = rust_name("serde_yaml::value", "Value");
+                to_ref(res, top_param)
+            }
         }
     }
 }
@@ -159,7 +165,7 @@ pub fn ref_type_name(reference: &str, ref_cache: &mut RefCache) -> Result<DataTy
     }))
 }
 
-fn schema_type(schema: &Schema, ref_cache: &mut RefCache) -> Result<DataType> {
+fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<&str>) -> Result<DataType> {
     match &schema.schema_kind {
         SchemaKind::Type(tpe) => match tpe {
             Type::String(string_type) => {
@@ -213,7 +219,7 @@ fn schema_type(schema: &Schema, ref_cache: &mut RefCache) -> Result<DataType> {
                             "Object parameter with Any additional_properties is not supported.",
                         )),
                         AdditionalProperties::Schema(element_schema) => Ok(DataType::MapOf(
-                            Box::new(ref_or_schema_type(element_schema, ref_cache)?),
+                            Box::new(ref_or_schema_type(element_schema, ref_cache, None)?),
                         )),
                     }
                 } else {
@@ -238,17 +244,30 @@ fn schema_type(schema: &Schema, ref_cache: &mut RefCache) -> Result<DataType> {
         SchemaKind::AllOf { .. } => Err(Error::unimplemented("AllOf parameter is not supported.")),
         SchemaKind::AnyOf { .. } => Err(Error::unimplemented("AnyOf parameter is not supported.")),
         SchemaKind::Not { .. } => Err(Error::unimplemented("Not parameter is not supported.")),
-        SchemaKind::Any(_) => Ok(DataType::Json),
+        SchemaKind::Any(_) => {
+            if let Some(content_type) = content_type {
+                if content_type == "application/json" {
+                    Ok(DataType::Json)
+                } else if content_type == "application/x-yaml" {
+                    Ok(DataType::Yaml)
+                } else {
+                    Err(Error::unexpected(format!("Cannot resolve the data type for content_type {} with `any` schema-kind", content_type)))
+                }
+            } else {
+                Err(Error::unexpected("Cannot resolve the data type for any schema-kind with no details on content_type"))
+            }
+        },
     }
 }
 
 pub fn ref_or_schema_type(
     ref_or_schema: &ReferenceOr<Schema>,
     ref_cache: &mut RefCache,
+    content_type: Option<&str>
 ) -> Result<DataType> {
     match ref_or_schema {
         ReferenceOr::Reference { reference } => ref_type_name(reference, ref_cache),
-        ReferenceOr::Item(schema) => schema_type(schema, ref_cache),
+        ReferenceOr::Item(schema) => schema_type(schema, ref_cache, content_type),
     }
 }
 
@@ -258,6 +277,6 @@ pub fn ref_or_box_schema_type(
 ) -> Result<DataType> {
     match ref_or_schema {
         ReferenceOr::Reference { reference } => ref_type_name(reference, ref_cache),
-        ReferenceOr::Item(schema) => schema_type(schema, ref_cache),
+        ReferenceOr::Item(schema) => schema_type(schema, ref_cache, None),
     }
 }

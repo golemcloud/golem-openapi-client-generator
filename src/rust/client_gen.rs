@@ -268,7 +268,7 @@ fn match_tag(tag: &Option<Tag>, path_item: &ReferenceOr<PathItem>) -> bool {
 fn param_data_to_type(data: &ParameterData, ref_cache: &mut RefCache) -> Result<DataType> {
     match &data.format {
         ParameterSchemaOrContent::Schema(ref_or_schema) => {
-            ref_or_schema_type(ref_or_schema, ref_cache)
+            ref_or_schema_type(ref_or_schema, ref_cache, None)
         }
         ParameterSchemaOrContent::Content(_) => {
             Err(Error::unimplemented("Content parameter is not supported."))
@@ -301,79 +301,95 @@ fn request_body_params(
             "Unexpected ref request body: '{reference}'."
         ))),
         ReferenceOr::Item(body) => {
-            if body.content.len() != 1 {
-                Err(Error::unimplemented("Content with not exactly 1 option."))
-            } else {
-                let (content_type, media_type) = body.content.first().unwrap();
+            let (content_type, media_type) =
+                // TODO: It is in standards that a REST API may support multiple content types
+                // and we shouldn't fail. Handle this to complete the PR
+                body.content.first().unwrap();
 
-                if content_type.starts_with("application/json") {
-                    let schema = match &media_type.schema {
-                        None => Err(Error::unimplemented("JSON content without schema.")),
-                        Some(schema) => Ok(schema),
-                    };
+            if content_type.starts_with("application/json") {
+                let schema = match &media_type.schema {
+                    None => Err(Error::unimplemented("JSON content without schema.")),
+                    Some(schema) => Ok(schema),
+                };
 
-                    Ok(vec![Param {
-                        original_name: "".to_string(),
-                        name: "value".to_string(),
-                        tpe: ref_or_schema_type(schema?, ref_cache)?,
-                        required: body.required,
-                        kind: ParamKind::Body,
-                    }])
-                } else if content_type == "application/octet-stream" {
-                    Ok(vec![Param {
-                        original_name: "".to_string(),
-                        name: "value".to_string(),
-                        tpe: DataType::Binary,
-                        required: body.required,
-                        kind: ParamKind::Body,
-                    }])
-                } else if content_type == "multipart/form-data" {
-                    match &media_type.schema {
-                        None => Err(Error::unimplemented("Multipart content without schema.")),
-                        Some(schema) => match schema {
-                            ReferenceOr::Reference { reference } => Err(Error::unimplemented(
-                                format!("Unexpected ref multipart schema: '{reference}'."),
-                            )),
-                            ReferenceOr::Item(schema) => match &schema.schema_kind {
-                                SchemaKind::Type(Type::Object(obj)) => {
-                                    fn multipart_param(
-                                        name: &str,
-                                        required: bool,
-                                        schema: &ReferenceOr<Box<Schema>>,
-                                        ref_cache: &mut RefCache,
-                                    ) -> Result<Param> {
-                                        Ok(Param {
-                                            original_name: name.to_string(),
-                                            name: name.to_case(Case::Snake),
-                                            tpe: ref_or_box_schema_type(schema, ref_cache)?,
-                                            required,
-                                            kind: ParamKind::Multipart,
-                                        })
-                                    }
+                let param = Param {
+                    original_name: "".to_string(),
+                    name: "value".to_string(),
+                    tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type))?,
+                    required: body.required,
+                    kind: ParamKind::Body,
+                };
 
-                                    obj.properties
-                                        .iter()
-                                        .map(|(name, schema)| {
-                                            multipart_param(
-                                                name,
-                                                body.required && obj.required.contains(name),
-                                                schema,
-                                                ref_cache,
-                                            )
-                                        })
-                                        .collect()
+                Ok(vec![param])
+            } else if content_type == "application/octet-stream" {
+                Ok(vec![Param {
+                    original_name: "".to_string(),
+                    name: "value".to_string(),
+                    tpe: DataType::Binary,
+                    required: body.required,
+                    kind: ParamKind::Body,
+                }])
+            } else if content_type == "application/x-yaml" {
+                let schema = match &media_type.schema {
+                    None => Err(Error::unimplemented("YAML content without schema.")),
+                    Some(schema) => Ok(schema),
+                };
+
+                let param = Param {
+                    original_name: "".to_string(),
+                    name: "value".to_string(),
+                    tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type))?,
+                    required: body.required,
+                    kind: ParamKind::Body,
+                };
+
+                Ok(vec![param])
+            } else if content_type == "multipart/form-data" {
+                match &media_type.schema {
+                    None => Err(Error::unimplemented("Multipart content without schema.")),
+                    Some(schema) => match schema {
+                        ReferenceOr::Reference { reference } => Err(Error::unimplemented(format!(
+                            "Unexpected ref multipart schema: '{reference}'."
+                        ))),
+                        ReferenceOr::Item(schema) => match &schema.schema_kind {
+                            SchemaKind::Type(Type::Object(obj)) => {
+                                fn multipart_param(
+                                    name: &str,
+                                    required: bool,
+                                    schema: &ReferenceOr<Box<Schema>>,
+                                    ref_cache: &mut RefCache,
+                                ) -> Result<Param> {
+                                    Ok(Param {
+                                        original_name: name.to_string(),
+                                        name: name.to_case(Case::Snake),
+                                        tpe: ref_or_box_schema_type(schema, ref_cache)?,
+                                        required,
+                                        kind: ParamKind::Multipart,
+                                    })
                                 }
-                                _ => Err(Error::unimplemented(
-                                    "Object schema expected for multipart request body.",
-                                )),
-                            },
+
+                                obj.properties
+                                    .iter()
+                                    .map(|(name, schema)| {
+                                        multipart_param(
+                                            name,
+                                            body.required && obj.required.contains(name),
+                                            schema,
+                                            ref_cache,
+                                        )
+                                    })
+                                    .collect()
+                            }
+                            _ => Err(Error::unimplemented(
+                                "Object schema expected for multipart request body.",
+                            )),
                         },
-                    }
-                } else {
-                    Err(Error::unimplemented(format!(
-                        "Request body content type: '{content_type}'."
-                    )))
+                    },
                 }
+            } else {
+                Err(Error::unimplemented(format!(
+                    "Request body content type: '{content_type}'."
+                )))
             }
         }
     }
@@ -449,7 +465,7 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
                         Some(schema) => Ok(schema),
                     };
 
-                    Ok(ref_or_schema_type(schema?, ref_cache)?)
+                    Ok(ref_or_schema_type(schema?, ref_cache, Some(content_type))?)
                 } else if content_type == "application/octet-stream" {
                     Ok(DataType::Binary)
                 } else {
@@ -837,7 +853,13 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
                         r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/octet-stream");"#,
                     )
                     + NewLine
-            } else {
+            } else if param.tpe == DataType::Yaml {
+                line(
+                    r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/x-yaml");"#,
+                ) + NewLine
+            }
+            // Not sure why everything else is assumed to be json (previously)
+            else {
                 line(unit() + "request = request.json(" + &param.name + ");") + NewLine
             }
         }
