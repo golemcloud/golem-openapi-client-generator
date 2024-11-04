@@ -337,7 +337,7 @@ fn request_body_params(
         }
         ReferenceOr::Item(body) => {
             for (content_type, media_type) in &body.content {
-                if content_type.starts_with("application/json") {
+                if content_type.starts_with("application/json") || content_type == "*/*" {
                     let schema = match &media_type.schema {
                         None => Err(Error::unimplemented("JSON content without schema.")),
                         Some(schema) => Ok(schema),
@@ -368,7 +368,7 @@ fn request_body_params(
                             kind: ParamKind::Body,
                         }],
                     );
-                } else if content_type == "application/x-yaml" {
+                } else if content_type.contains("application/x-yaml") {
                     let schema = match &media_type.schema {
                         None => Err(Error::unimplemented("YAML content without schema.")),
                         Some(schema) => Ok(schema),

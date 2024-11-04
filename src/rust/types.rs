@@ -250,7 +250,7 @@ fn schema_type(
         SchemaKind::Not { .. } => Err(Error::unimplemented("Not parameter is not supported.")),
         SchemaKind::Any(_) => {
             if let Some(content_type) = content_type {
-                if &content_type == "application/json" {
+                if &content_type == "application/json" || &content_type == "*/*" {
                     Ok(DataType::Json)
                 } else if &content_type == "application/x-yaml" {
                     Ok(DataType::Yaml)
