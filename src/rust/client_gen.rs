@@ -854,9 +854,10 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
                     )
                     + NewLine
             } else if param.tpe == DataType::Yaml {
-                line(
-                    r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/x-yaml");"#,
-                ) + NewLine
+                line(unit() + "request = request.body(serde_yaml::to_string(" + &param.name + ").unwrap_or_default().into_bytes());") +
+                    line(
+                        r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/x-yaml");"#,
+                    ) + NewLine
             }
             // Not sure why everything else is assumed to be json (previously)
             else {
