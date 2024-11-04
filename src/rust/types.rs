@@ -76,7 +76,6 @@ pub enum DataType {
     Yaml,
 }
 
-
 pub fn escape_keywords(name: &str) -> String {
     if name == "type" {
         "r#type".to_string()
@@ -166,7 +165,11 @@ pub fn ref_type_name(reference: &str, ref_cache: &mut RefCache) -> Result<DataTy
     }))
 }
 
-fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<String>) -> Result<DataType> {
+fn schema_type(
+    schema: &Schema,
+    ref_cache: &mut RefCache,
+    content_type: Option<String>,
+) -> Result<DataType> {
     match &schema.schema_kind {
         SchemaKind::Type(tpe) => match tpe {
             Type::String(string_type) => {
@@ -252,19 +255,22 @@ fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<S
                 } else if &content_type == "application/x-yaml" {
                     Ok(DataType::Yaml)
                 } else {
-                    Err(Error::unexpected(format!("Cannot resolve the data type for content_type {} with `any` schema-kind", content_type)))
+                    Err(Error::unexpected(format!(
+                        "Cannot resolve the data type for content_type {} with `any` schema-kind",
+                        content_type
+                    )))
                 }
             } else {
                 Err(Error::unexpected("Cannot resolve the data type for any schema-kind with no details on content_type"))
             }
-        },
+        }
     }
 }
 
 pub fn ref_or_schema_type(
     ref_or_schema: &ReferenceOr<Schema>,
     ref_cache: &mut RefCache,
-    content_type: Option<String>
+    content_type: Option<String>,
 ) -> Result<DataType> {
     match ref_or_schema {
         ReferenceOr::Reference { reference } => ref_type_name(reference, ref_cache),

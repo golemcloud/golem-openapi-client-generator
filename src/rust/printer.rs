@@ -147,7 +147,6 @@ pub fn rust_name_with_alias(import: &str, name: &str, alias: &str) -> TreePrinte
     })
 }
 
-
 impl IntoRustTree for TreePrinter<RustContext> {
     fn tree(self) -> TreePrinter<RustContext> {
         self

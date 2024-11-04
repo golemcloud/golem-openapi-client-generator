@@ -197,7 +197,10 @@ impl RequestBodyParams {
     }
 
     pub fn get_default_request_body_param(&self) -> Option<&Vec<Param>> {
-        self.params.values().next().filter(|_| self.has_single_content_type())
+        self.params
+            .values()
+            .next()
+            .filter(|_| self.has_single_content_type())
     }
 }
 
@@ -324,38 +327,47 @@ fn request_body_params(
     body: &ReferenceOr<RequestBody>,
     ref_cache: &mut RefCache,
 ) -> Result<RequestBodyParams> {
-
     let mut content_type_params = HashMap::new();
 
     match body {
-        ReferenceOr::Reference { reference } => return Err(Error::unimplemented(format!(
-            "Unexpected ref request body: '{reference}'."
-        ))),
+        ReferenceOr::Reference { reference } => {
+            return Err(Error::unimplemented(format!(
+                "Unexpected ref request body: '{reference}'."
+            )))
+        }
         ReferenceOr::Item(body) => {
-            for (content_type, media_type)  in &body.content {
-
+            for (content_type, media_type) in &body.content {
                 if content_type.starts_with("application/json") {
                     let schema = match &media_type.schema {
                         None => Err(Error::unimplemented("JSON content without schema.")),
                         Some(schema) => Ok(schema),
                     };
 
-                    content_type_params.insert(ContentType(content_type.clone()), vec![Param {
-                        original_name: "".to_string(),
-                        name: "value".to_string(),
-                        tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type.clone()))?,
-                        required: body.required,
-                        kind: ParamKind::Body,
-                    }]);
+                    content_type_params.insert(
+                        ContentType(content_type.clone()),
+                        vec![Param {
+                            original_name: "".to_string(),
+                            name: "value".to_string(),
+                            tpe: ref_or_schema_type(
+                                schema?,
+                                ref_cache,
+                                Some(content_type.clone()),
+                            )?,
+                            required: body.required,
+                            kind: ParamKind::Body,
+                        }],
+                    );
                 } else if content_type == "application/octet-stream" {
-                    content_type_params.insert(ContentType(content_type.clone()), vec![Param {
-                        original_name: "".to_string(),
-                        name: "value".to_string(),
-                        tpe: DataType::Binary,
-                        required: body.required,
-                        kind: ParamKind::Body,
-                    }]);
-
+                    content_type_params.insert(
+                        ContentType(content_type.clone()),
+                        vec![Param {
+                            original_name: "".to_string(),
+                            name: "value".to_string(),
+                            tpe: DataType::Binary,
+                            required: body.required,
+                            kind: ParamKind::Body,
+                        }],
+                    );
                 } else if content_type == "application/x-yaml" {
                     let schema = match &media_type.schema {
                         None => Err(Error::unimplemented("YAML content without schema.")),
@@ -371,14 +383,17 @@ fn request_body_params(
                     };
 
                     content_type_params.insert(ContentType(content_type.clone()), vec![param]);
-
                 } else if content_type == "multipart/form-data" {
                     match &media_type.schema {
-                        None => return Err(Error::unimplemented("Multipart content without schema.")),
+                        None => {
+                            return Err(Error::unimplemented("Multipart content without schema."))
+                        }
                         Some(schema) => match schema {
-                            ReferenceOr::Reference { reference } => return Err(Error::unimplemented(format!(
-                                "Unexpected ref multipart schema: '{reference}'."
-                            ))),
+                            ReferenceOr::Reference { reference } => {
+                                return Err(Error::unimplemented(format!(
+                                    "Unexpected ref multipart schema: '{reference}'."
+                                )))
+                            }
                             ReferenceOr::Item(schema) => match &schema.schema_kind {
                                 SchemaKind::Type(Type::Object(obj)) => {
                                     fn multipart_param(
@@ -396,7 +411,8 @@ fn request_body_params(
                                         })
                                     }
 
-                                    let params = obj.properties
+                                    let params = obj
+                                        .properties
                                         .iter()
                                         .map(|(name, schema)| {
                                             multipart_param(
@@ -408,31 +424,33 @@ fn request_body_params(
                                         })
                                         .collect::<Result<Vec<_>>>()?;
 
-                                    content_type_params.insert(ContentType(content_type.clone()), params);
+                                    content_type_params
+                                        .insert(ContentType(content_type.clone()), params);
                                 }
-                                _ => return Err(Error::unimplemented(
-                                    "Object schema expected for multipart request body.",
-                                )),
+                                _ => {
+                                    return Err(Error::unimplemented(
+                                        "Object schema expected for multipart request body.",
+                                    ))
+                                }
                             },
                         },
                     }
                 } else {
-                   return Err(Error::unimplemented(format!(
+                    return Err(Error::unimplemented(format!(
                         "Request body content type: '{content_type}'."
-                    )))
+                    )));
                 }
             }
         }
     }
 
     Ok(RequestBodyParams {
-        params: content_type_params
+        params: content_type_params,
     })
 }
 
 fn parameters(op: &PathOperation, ref_cache: &mut RefCache) -> Result<Vec<Param>> {
-    op
-        .op
+    op.op
         .parameters
         .iter()
         .map(|p| parameter(p, ref_cache))
@@ -490,7 +508,11 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
                         Some(schema) => Ok(schema),
                     };
 
-                    Ok(ref_or_schema_type(schema?, ref_cache, Some(content_type.clone()))?)
+                    Ok(ref_or_schema_type(
+                        schema?,
+                        ref_cache,
+                        Some(content_type.clone()),
+                    )?)
                 } else if content_type == "application/octet-stream" {
                     Ok(DataType::Binary)
                 } else {
@@ -580,17 +602,20 @@ fn trait_method(
                     }
 
                     let method_name = format!("{}_json", name);
-                    methods.push(
-                        Method {
-                            name: method_name,
-                            path: op.path.clone(),
-                            original_path: op.original_path.clone(),
-                            http_method: op.method.to_string(),
-                            params: new_params.clone(),
-                            result: result_type.clone(),
-                            result_status_code: result_code.clone(),
-                            errors: method_errors(&op.op.responses.responses, result_code.clone(), ref_cache)?,
-                        });
+                    methods.push(Method {
+                        name: method_name,
+                        path: op.path.clone(),
+                        original_path: op.original_path.clone(),
+                        http_method: op.method.to_string(),
+                        params: new_params.clone(),
+                        result: result_type.clone(),
+                        result_status_code: result_code.clone(),
+                        errors: method_errors(
+                            &op.op.responses.responses,
+                            result_code.clone(),
+                            ref_cache,
+                        )?,
+                    });
                 } else if content_type.is_yaml() {
                     let mut new_params = main_params.clone();
 
@@ -600,17 +625,20 @@ fn trait_method(
 
                     let method_name = format!("{}_yaml", name);
 
-                    methods.push(
-                        Method {
-                            name: method_name,
-                            path: op.path.clone(),
-                            original_path: op.original_path.clone(),
-                            http_method: op.method.to_string(),
-                            params: new_params.clone(),
-                            result: result_type.clone(),
-                            result_status_code: result_code.clone(),
-                            errors: method_errors(&op.op.responses.responses, result_code.clone(), ref_cache)?,
-                        });
+                    methods.push(Method {
+                        name: method_name,
+                        path: op.path.clone(),
+                        original_path: op.original_path.clone(),
+                        http_method: op.method.to_string(),
+                        params: new_params.clone(),
+                        result: result_type.clone(),
+                        result_status_code: result_code.clone(),
+                        errors: method_errors(
+                            &op.op.responses.responses,
+                            result_code.clone(),
+                            ref_cache,
+                        )?,
+                    });
                 }
             }
 
@@ -951,10 +979,14 @@ fn render_method_implementation(method: &Method, error_kind: &ErrorKind) -> Rust
                     )
                     + NewLine
             } else if param.tpe == DataType::Yaml {
-                line(unit() + "request = request.body(serde_yaml::to_string(" + &param.name + ").unwrap_or_default().into_bytes());") +
-                    line(
-                        r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/x-yaml");"#,
-                    ) + NewLine
+                line(
+                    unit()
+                        + "request = request.body(serde_yaml::to_string("
+                        + &param.name
+                        + ").unwrap_or_default().into_bytes());",
+                ) + line(
+                    r#"request = request.header(reqwest::header::CONTENT_TYPE, "application/x-yaml");"#,
+                ) + NewLine
             }
             // Not sure why everything else is assumed to be json (previously)
             else {
