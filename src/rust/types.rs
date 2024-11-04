@@ -15,7 +15,7 @@
 use crate::printer::TreePrinter;
 use crate::rust::lib_gen::ModuleName;
 use crate::rust::model_gen::RefCache;
-use crate::rust::printer::{rust_name, unit, RustContext};
+use crate::rust::printer::{rust_name, rust_name_with_alias, unit, RustContext};
 use crate::{Error, Result};
 use convert_case::{Case, Casing};
 use openapiv3::{
@@ -73,8 +73,9 @@ pub enum DataType {
     Array(Box<DataType>),
     MapOf(Box<DataType>),
     Json,
-    Yaml
+    Yaml,
 }
+
 
 pub fn escape_keywords(name: &str) -> String {
     if name == "type" {
@@ -146,7 +147,7 @@ impl DataType {
             }
 
             DataType::Yaml => {
-                let res = rust_name("serde_yaml::value", "Value");
+                let res = rust_name_with_alias("serde_yaml::value", "Value", "YamlValue");
                 to_ref(res, top_param)
             }
         }
@@ -165,7 +166,7 @@ pub fn ref_type_name(reference: &str, ref_cache: &mut RefCache) -> Result<DataTy
     }))
 }
 
-fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<&str>) -> Result<DataType> {
+fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<String>) -> Result<DataType> {
     match &schema.schema_kind {
         SchemaKind::Type(tpe) => match tpe {
             Type::String(string_type) => {
@@ -246,9 +247,9 @@ fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<&
         SchemaKind::Not { .. } => Err(Error::unimplemented("Not parameter is not supported.")),
         SchemaKind::Any(_) => {
             if let Some(content_type) = content_type {
-                if content_type == "application/json" {
+                if &content_type == "application/json" {
                     Ok(DataType::Json)
-                } else if content_type == "application/x-yaml" {
+                } else if &content_type == "application/x-yaml" {
                     Ok(DataType::Yaml)
                 } else {
                     Err(Error::unexpected(format!("Cannot resolve the data type for content_type {} with `any` schema-kind", content_type)))
@@ -263,7 +264,7 @@ fn schema_type(schema: &Schema, ref_cache: &mut RefCache, content_type: Option<&
 pub fn ref_or_schema_type(
     ref_or_schema: &ReferenceOr<Schema>,
     ref_cache: &mut RefCache,
-    content_type: Option<&str>
+    content_type: Option<String>
 ) -> Result<DataType> {
     match ref_or_schema {
         ReferenceOr::Reference { reference } => ref_type_name(reference, ref_cache),

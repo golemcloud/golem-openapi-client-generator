@@ -27,7 +27,7 @@ use openapiv3::{
     OpenAPI, Operation, Parameter, ParameterData, ParameterSchemaOrContent, PathItem, ReferenceOr,
     RequestBody, Response, Schema, SchemaKind, StatusCode, Tag, Type,
 };
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum PathElement {
@@ -186,6 +186,34 @@ struct Param {
     kind: ParamKind,
 }
 
+#[derive(Debug, Clone)]
+pub struct RequestBodyParams {
+    params: HashMap<ContentType, Vec<Param>>,
+}
+
+impl RequestBodyParams {
+    pub fn has_single_content_type(&self) -> bool {
+        self.params.len() == 1
+    }
+
+    pub fn get_default_request_body_param(&self) -> Option<&Vec<Param>> {
+        self.params.values().next().filter(|_| self.has_single_content_type())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+pub struct ContentType(pub String);
+
+impl ContentType {
+    pub fn is_json(&self) -> bool {
+        self.0 == "application/json"
+    }
+
+    pub fn is_yaml(&self) -> bool {
+        self.0 == "application/x-yaml"
+    }
+}
+
 impl Param {
     fn render_declaration(&self) -> RustPrinter {
         let type_name = self.tpe.render_declaration(true);
@@ -295,123 +323,120 @@ fn parameter(p: &ReferenceOr<Parameter>, ref_cache: &mut RefCache) -> Result<Par
 fn request_body_params(
     body: &ReferenceOr<RequestBody>,
     ref_cache: &mut RefCache,
-) -> Result<Vec<Param>> {
+) -> Result<RequestBodyParams> {
+
+    let mut content_type_params = HashMap::new();
+
     match body {
-        ReferenceOr::Reference { reference } => Err(Error::unimplemented(format!(
+        ReferenceOr::Reference { reference } => return Err(Error::unimplemented(format!(
             "Unexpected ref request body: '{reference}'."
         ))),
         ReferenceOr::Item(body) => {
-            let (content_type, media_type) =
-                // TODO: It is in standards that a REST API may support multiple content types
-                // and we shouldn't fail. Handle this to complete the PR
-                body.content.first().unwrap();
+            for (content_type, media_type)  in &body.content {
 
-            if content_type.starts_with("application/json") {
-                let schema = match &media_type.schema {
-                    None => Err(Error::unimplemented("JSON content without schema.")),
-                    Some(schema) => Ok(schema),
-                };
+                if content_type.starts_with("application/json") {
+                    let schema = match &media_type.schema {
+                        None => Err(Error::unimplemented("JSON content without schema.")),
+                        Some(schema) => Ok(schema),
+                    };
 
-                let param = Param {
-                    original_name: "".to_string(),
-                    name: "value".to_string(),
-                    tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type))?,
-                    required: body.required,
-                    kind: ParamKind::Body,
-                };
+                    content_type_params.insert(ContentType(content_type.clone()), vec![Param {
+                        original_name: "".to_string(),
+                        name: "value".to_string(),
+                        tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type.clone()))?,
+                        required: body.required,
+                        kind: ParamKind::Body,
+                    }]);
+                } else if content_type == "application/octet-stream" {
+                    content_type_params.insert(ContentType(content_type.clone()), vec![Param {
+                        original_name: "".to_string(),
+                        name: "value".to_string(),
+                        tpe: DataType::Binary,
+                        required: body.required,
+                        kind: ParamKind::Body,
+                    }]);
 
-                Ok(vec![param])
-            } else if content_type == "application/octet-stream" {
-                Ok(vec![Param {
-                    original_name: "".to_string(),
-                    name: "value".to_string(),
-                    tpe: DataType::Binary,
-                    required: body.required,
-                    kind: ParamKind::Body,
-                }])
-            } else if content_type == "application/x-yaml" {
-                let schema = match &media_type.schema {
-                    None => Err(Error::unimplemented("YAML content without schema.")),
-                    Some(schema) => Ok(schema),
-                };
+                } else if content_type == "application/x-yaml" {
+                    let schema = match &media_type.schema {
+                        None => Err(Error::unimplemented("YAML content without schema.")),
+                        Some(schema) => Ok(schema),
+                    };
 
-                let param = Param {
-                    original_name: "".to_string(),
-                    name: "value".to_string(),
-                    tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type))?,
-                    required: body.required,
-                    kind: ParamKind::Body,
-                };
+                    let param = Param {
+                        original_name: "".to_string(),
+                        name: "value".to_string(),
+                        tpe: ref_or_schema_type(schema?, ref_cache, Some(content_type.clone()))?,
+                        required: body.required,
+                        kind: ParamKind::Body,
+                    };
 
-                Ok(vec![param])
-            } else if content_type == "multipart/form-data" {
-                match &media_type.schema {
-                    None => Err(Error::unimplemented("Multipart content without schema.")),
-                    Some(schema) => match schema {
-                        ReferenceOr::Reference { reference } => Err(Error::unimplemented(format!(
-                            "Unexpected ref multipart schema: '{reference}'."
-                        ))),
-                        ReferenceOr::Item(schema) => match &schema.schema_kind {
-                            SchemaKind::Type(Type::Object(obj)) => {
-                                fn multipart_param(
-                                    name: &str,
-                                    required: bool,
-                                    schema: &ReferenceOr<Box<Schema>>,
-                                    ref_cache: &mut RefCache,
-                                ) -> Result<Param> {
-                                    Ok(Param {
-                                        original_name: name.to_string(),
-                                        name: name.to_case(Case::Snake),
-                                        tpe: ref_or_box_schema_type(schema, ref_cache)?,
-                                        required,
-                                        kind: ParamKind::Multipart,
-                                    })
+                    content_type_params.insert(ContentType(content_type.clone()), vec![param]);
+
+                } else if content_type == "multipart/form-data" {
+                    match &media_type.schema {
+                        None => return Err(Error::unimplemented("Multipart content without schema.")),
+                        Some(schema) => match schema {
+                            ReferenceOr::Reference { reference } => return Err(Error::unimplemented(format!(
+                                "Unexpected ref multipart schema: '{reference}'."
+                            ))),
+                            ReferenceOr::Item(schema) => match &schema.schema_kind {
+                                SchemaKind::Type(Type::Object(obj)) => {
+                                    fn multipart_param(
+                                        name: &str,
+                                        required: bool,
+                                        schema: &ReferenceOr<Box<Schema>>,
+                                        ref_cache: &mut RefCache,
+                                    ) -> Result<Param> {
+                                        Ok(Param {
+                                            original_name: name.to_string(),
+                                            name: name.to_case(Case::Snake),
+                                            tpe: ref_or_box_schema_type(schema, ref_cache)?,
+                                            required,
+                                            kind: ParamKind::Multipart,
+                                        })
+                                    }
+
+                                    let params = obj.properties
+                                        .iter()
+                                        .map(|(name, schema)| {
+                                            multipart_param(
+                                                name,
+                                                body.required && obj.required.contains(name),
+                                                schema,
+                                                ref_cache,
+                                            )
+                                        })
+                                        .collect::<Result<Vec<_>>>()?;
+
+                                    content_type_params.insert(ContentType(content_type.clone()), params);
                                 }
-
-                                obj.properties
-                                    .iter()
-                                    .map(|(name, schema)| {
-                                        multipart_param(
-                                            name,
-                                            body.required && obj.required.contains(name),
-                                            schema,
-                                            ref_cache,
-                                        )
-                                    })
-                                    .collect()
-                            }
-                            _ => Err(Error::unimplemented(
-                                "Object schema expected for multipart request body.",
-                            )),
+                                _ => return Err(Error::unimplemented(
+                                    "Object schema expected for multipart request body.",
+                                )),
+                            },
                         },
-                    },
+                    }
+                } else {
+                   return Err(Error::unimplemented(format!(
+                        "Request body content type: '{content_type}'."
+                    )))
                 }
-            } else {
-                Err(Error::unimplemented(format!(
-                    "Request body content type: '{content_type}'."
-                )))
             }
         }
     }
+
+    Ok(RequestBodyParams {
+        params: content_type_params
+    })
 }
 
 fn parameters(op: &PathOperation, ref_cache: &mut RefCache) -> Result<Vec<Param>> {
-    let params: Result<Vec<Param>> = op
+    op
         .op
         .parameters
         .iter()
         .map(|p| parameter(p, ref_cache))
-        .collect();
-
-    let mut params = params?;
-
-    if let Some(body) = &op.op.request_body {
-        for p in request_body_params(body, ref_cache)? {
-            params.push(p);
-        }
-    }
-
-    Ok(params)
+        .collect()
 }
 
 fn as_code(code: &StatusCode) -> Option<u16> {
@@ -465,7 +490,7 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
                         Some(schema) => Ok(schema),
                     };
 
-                    Ok(ref_or_schema_type(schema?, ref_cache, Some(content_type))?)
+                    Ok(ref_or_schema_type(schema?, ref_cache, Some(content_type.clone()))?)
                 } else if content_type == "application/octet-stream" {
                     Ok(DataType::Binary)
                 } else {
@@ -514,7 +539,7 @@ fn trait_method(
     op: &PathOperation,
     prefix_length: usize,
     ref_cache: &mut RefCache,
-) -> Result<Method> {
+) -> Result<Vec<Method>> {
     let (result_code, result_type) = method_result(&op.op.responses.responses, ref_cache)?;
 
     let name = if let Some(op_id) = &op.op.operation_id {
@@ -523,16 +548,86 @@ fn trait_method(
         op.path.strip_prefix(prefix_length).method_name(&op.method)
     };
 
-    Ok(Method {
-        name,
-        path: op.path.clone(),
-        original_path: op.original_path.clone(),
-        http_method: op.method.to_string(),
-        params: parameters(op, ref_cache)?,
-        result: result_type,
-        result_status_code: result_code.clone(),
-        errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
-    })
+    let mut main_params = parameters(op, ref_cache)?;
+
+    if let Some(body) = &op.op.request_body {
+        let content_specific = request_body_params(body, ref_cache)?;
+
+        if let Some(request_body_params) = content_specific.get_default_request_body_param() {
+            for i in request_body_params {
+                main_params.push(i.clone())
+            }
+
+            Ok(vec![Method {
+                name,
+                path: op.path.clone(),
+                original_path: op.original_path.clone(),
+                http_method: op.method.to_string(),
+                params: main_params,
+                result: result_type,
+                result_status_code: result_code.clone(),
+                errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
+            }])
+        } else {
+            let mut methods = vec![];
+
+            for (content_type, params) in content_specific.params {
+                if content_type.is_json() {
+                    let mut new_params = main_params.clone();
+
+                    for i in params {
+                        new_params.push(i)
+                    }
+
+                    let method_name = format!("{}_json", name);
+                    methods.push(
+                        Method {
+                            name: method_name,
+                            path: op.path.clone(),
+                            original_path: op.original_path.clone(),
+                            http_method: op.method.to_string(),
+                            params: new_params.clone(),
+                            result: result_type.clone(),
+                            result_status_code: result_code.clone(),
+                            errors: method_errors(&op.op.responses.responses, result_code.clone(), ref_cache)?,
+                        });
+                } else if content_type.is_yaml() {
+                    let mut new_params = main_params.clone();
+
+                    for i in params {
+                        new_params.push(i)
+                    }
+
+                    let method_name = format!("{}_yaml", name);
+
+                    methods.push(
+                        Method {
+                            name: method_name,
+                            path: op.path.clone(),
+                            original_path: op.original_path.clone(),
+                            http_method: op.method.to_string(),
+                            params: new_params.clone(),
+                            result: result_type.clone(),
+                            result_status_code: result_code.clone(),
+                            errors: method_errors(&op.op.responses.responses, result_code.clone(), ref_cache)?,
+                        });
+                }
+            }
+
+            Ok(methods)
+        }
+    } else {
+        Ok(vec![Method {
+            name,
+            path: op.path.clone(),
+            original_path: op.original_path.clone(),
+            http_method: op.method.to_string(),
+            params: main_params,
+            result: result_type,
+            result_status_code: result_code.clone(),
+            errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
+        }])
+    }
 }
 
 fn trait_methods(
@@ -540,10 +635,12 @@ fn trait_methods(
     prefix_length: usize,
     ref_cache: &mut RefCache,
 ) -> Result<Vec<Method>> {
-    operations
+    let res = operations
         .iter()
         .map(|op| trait_method(op, prefix_length, ref_cache))
-        .collect()
+        .collect::<Result<Vec<Vec<_>>>>()?;
+
+    Ok(res.into_iter().flatten().collect())
 }
 
 fn render_errors(method_name: &str, error_kind: &ErrorKind, errors: &MethodErrors) -> RustResult {
