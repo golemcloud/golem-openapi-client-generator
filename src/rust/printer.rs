@@ -135,6 +135,18 @@ pub fn rust_name(import: &str, name: &str) -> TreePrinter<RustContext> {
     })
 }
 
+pub fn rust_name_with_alias(import: &str, name: &str, alias: &str) -> TreePrinter<RustContext> {
+    let import_name = if name.ends_with('!') {
+        &name[0..name.len() - 1]
+    } else {
+        name
+    };
+    TreePrinter::leaf(RustCode {
+        imports: HashSet::from([RustUse(format!("{import}::{import_name} as {alias}"))]),
+        code: alias.to_string(),
+    })
+}
+
 impl IntoRustTree for TreePrinter<RustContext> {
     fn tree(self) -> TreePrinter<RustContext> {
         self
