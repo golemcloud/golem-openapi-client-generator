@@ -557,18 +557,19 @@ fn method_errors(
     Ok(MethodErrors { codes: codes? })
 }
 
-fn trait_method(
+fn trait_methods_specific_to_content_type(
     op: &PathOperation,
     prefix_length: usize,
     ref_cache: &mut RefCache,
 ) -> Result<Vec<Method>> {
     let (result_code, result_type) = method_result(&op.op.responses.responses, ref_cache)?;
 
-    let name = if let Some(op_id) = &op.op.operation_id {
-        op_id.to_case(Case::Snake)
-    } else {
-        op.path.strip_prefix(prefix_length).method_name(&op.method)
-    };
+    let name = op
+        .op
+        .operation_id
+        .as_ref()
+        .map(|op_id| op_id.to_case(Case::Snake))
+        .unwrap_or_else(|| op.path.strip_prefix(prefix_length).method_name(&op.method));
 
     let mut main_params = parameters(op, ref_cache)?;
 
@@ -576,85 +577,73 @@ fn trait_method(
         let content_specific = request_body_params(body, ref_cache)?;
 
         if let Some(request_body_params) = content_specific.get_default_request_body_param() {
-            for i in request_body_params {
-                main_params.push(i.clone())
-            }
-
-            Ok(vec![Method {
+            main_params.extend(request_body_params.iter().cloned());
+            return Ok(vec![create_method(
                 name,
-                path: op.path.clone(),
-                original_path: op.original_path.clone(),
-                http_method: op.method.to_string(),
-                params: main_params,
-                result: result_type,
-                result_status_code: result_code.clone(),
-                errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
-            }])
-        } else {
-            let mut methods = vec![];
-
-            for (content_type, params) in content_specific.params {
-                if content_type.is_json() {
-                    let mut new_params = main_params.clone();
-
-                    for i in params {
-                        new_params.push(i)
-                    }
-
-                    let method_name = format!("{}_json", name);
-                    methods.push(Method {
-                        name: method_name,
-                        path: op.path.clone(),
-                        original_path: op.original_path.clone(),
-                        http_method: op.method.to_string(),
-                        params: new_params.clone(),
-                        result: result_type.clone(),
-                        result_status_code: result_code.clone(),
-                        errors: method_errors(
-                            &op.op.responses.responses,
-                            result_code.clone(),
-                            ref_cache,
-                        )?,
-                    });
-                } else if content_type.is_yaml() {
-                    let mut new_params = main_params.clone();
-
-                    for i in params {
-                        new_params.push(i)
-                    }
-
-                    let method_name = format!("{}_yaml", name);
-
-                    methods.push(Method {
-                        name: method_name,
-                        path: op.path.clone(),
-                        original_path: op.original_path.clone(),
-                        http_method: op.method.to_string(),
-                        params: new_params.clone(),
-                        result: result_type.clone(),
-                        result_status_code: result_code.clone(),
-                        errors: method_errors(
-                            &op.op.responses.responses,
-                            result_code.clone(),
-                            ref_cache,
-                        )?,
-                    });
-                }
-            }
-
-            Ok(methods)
+                op,
+                &main_params,
+                result_type,
+                result_code,
+                ref_cache,
+            )?]);
         }
+
+        let mut methods = Vec::new();
+        for (content_type, params) in content_specific.params {
+            let method_name = match_content_type(content_type, &name)?;
+            let new_params = [main_params.clone(), params].concat();
+            methods.push(create_method(
+                method_name,
+                op,
+                &new_params,
+                result_type.clone(),
+                result_code.clone(),
+                ref_cache,
+            )?);
+        }
+
+        Ok(methods)
     } else {
-        Ok(vec![Method {
+        Ok(vec![create_method(
             name,
-            path: op.path.clone(),
-            original_path: op.original_path.clone(),
-            http_method: op.method.to_string(),
-            params: main_params,
-            result: result_type,
-            result_status_code: result_code.clone(),
-            errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
-        }])
+            op,
+            &main_params,
+            result_type,
+            result_code,
+            ref_cache,
+        )?])
+    }
+}
+
+fn create_method(
+    name: String,
+    op: &PathOperation,
+    params: &[Param],
+    result_type: DataType,
+    result_code: StatusCode,
+    ref_cache: &mut RefCache,
+) -> Result<Method> {
+    Ok(Method {
+        name,
+        path: op.path.clone(),
+        original_path: op.original_path.clone(),
+        http_method: op.method.to_string(),
+        params: params.to_vec(),
+        result: result_type,
+        result_status_code: result_code.clone(),
+        errors: method_errors(&op.op.responses.responses, result_code, ref_cache)?,
+    })
+}
+
+fn match_content_type(content_type: ContentType, base_name: &str) -> Result<String> {
+    if content_type.is_json() {
+        Ok(format!("{}_json", base_name))
+    } else if content_type.is_yaml() {
+        Ok(format!("{}_yaml", base_name))
+    } else {
+        Err(Error::unimplemented(
+            "Multiple content types supported only for JSON and YAML",
+        ))
     }
 }
 
@@ -665,7 +654,7 @@ fn trait_methods(
 ) -> Result<Vec<Method>> {
     let res = operations
         .iter()
-        .map(|op| trait_method(op, prefix_length, ref_cache))
+        .map(|op| trait_methods_specific_to_content_type(op, prefix_length, ref_cache))
         .collect::<Result<Vec<Vec<_>>>>()?;
 
     Ok(res.into_iter().flatten().collect())
