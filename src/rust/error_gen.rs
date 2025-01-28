@@ -19,6 +19,7 @@ pub fn error_gen() -> Module {
     let code = indoc! { r#"
         use bytes::Bytes;
 
+        #[derive(Debug)]
         pub enum Error<T> {
             Item(T),
             Reqwest(reqwest::Error),

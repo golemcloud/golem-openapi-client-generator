@@ -674,6 +674,7 @@ fn render_errors(method_name: &str, error_kind: &ErrorKind, errors: &MethodError
 
     #[rustfmt::skip]
     let res = unit() +
+        line(unit() + "#[derive(Debug)]") +
         line(unit() + "pub enum " + name + " {") +
         indented(
             code_cases
