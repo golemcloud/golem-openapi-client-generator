@@ -1081,6 +1081,7 @@ pub fn client_gen(
         .paths
         .iter()
         .filter(|(path_key, path_item)| {
+            println!("generating for path: {path_key}");
             !ignored_paths.contains(*path_key) && match_tag(&tag, path_item)
         })
         .map(|(p, _)| p.clone())
