@@ -1091,7 +1091,7 @@ pub fn client_gen(
 
     let common_prefix = paths
         .keys()
-        .map(|p| Path::from_string(&p))
+        .map(|p| Path::from_string(p))
         .reduce(|acc, e| e.common_prefix(acc));
 
     let prefix_length = common_prefix.map(|p| p.0.len()).unwrap_or(0);
