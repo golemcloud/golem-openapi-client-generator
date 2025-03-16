@@ -1072,11 +1072,17 @@ pub fn client_gen(
     open_api: &OpenAPI,
     tag: Option<Tag>,
     ref_cache: &mut RefCache,
+    ignored_paths: &[&str],
 ) -> Result<Module> {
+    let ignored_paths: HashSet<String> =
+        HashSet::from_iter(ignored_paths.iter().map(|ip| ip.to_string()));
+
     let paths: HashSet<String> = open_api
         .paths
         .iter()
-        .filter(|(_, path_item)| match_tag(&tag, path_item))
+        .filter(|(path_key, path_item)| {
+            !ignored_paths.contains(*path_key) && match_tag(&tag, path_item)
+        })
         .map(|(p, _)| p.clone())
         .collect();
 
