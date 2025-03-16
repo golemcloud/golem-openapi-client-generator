@@ -62,7 +62,7 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
-#[allow(clippy::too_many_arguments)
+#[allow(clippy::too_many_arguments)]
 pub fn gen(
     openapi_specs: Vec<OpenAPI>,
     target: &Path,
