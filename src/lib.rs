@@ -62,6 +62,7 @@ impl Error {
 
 pub type Result<T> = result::Result<T, Error>;
 
+#[allow(clippy::too_many_arguments)]
 pub fn gen(
     openapi_specs: Vec<OpenAPI>,
     target: &Path,
@@ -70,6 +71,7 @@ pub fn gen(
     overwrite_cargo: bool,
     disable_clippy: bool,
     mapping: &[(&str, &str)],
+    ignored_paths: &[&str],
 ) -> Result<()> {
     let mapping: HashMap<&str, &str> = HashMap::from_iter(mapping.iter().cloned());
 
@@ -90,7 +92,14 @@ pub fn gen(
     let modules: Result<Vec<Module>> = open_api
         .tags
         .iter()
-        .map(|tag| rust::client_gen::client_gen(&open_api, Some(tag.clone()), &mut ref_cache))
+        .map(|tag| {
+            rust::client_gen::client_gen(
+                &open_api,
+                Some(tag.clone()),
+                &mut ref_cache,
+                ignored_paths,
+            )
+        })
         .collect();
 
     let mut api_module_defs = Vec::new();
