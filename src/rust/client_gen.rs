@@ -1077,24 +1077,26 @@ pub fn client_gen(
     let ignored_paths: HashSet<String> =
         HashSet::from_iter(ignored_paths.iter().map(|ip| ip.to_string()));
 
-    let paths: HashSet<String> = open_api
+    let paths: HashMap<String, ReferenceOr<PathItem>> = open_api
         .paths
         .iter()
-        .filter(|(path_key, path_item)| {
-            println!("generating for path: {path_key}");
-            !ignored_paths.contains(*path_key) && match_tag(&tag, path_item)
+        .filter_map(|(path_key, path_item)| {
+            if !ignored_paths.contains(path_key) && match_tag(&tag, path_item) {
+                Some((path_key.clone(), path_item.clone()))
+            } else {
+                None
+            }
         })
-        .map(|(p, _)| p.clone())
         .collect();
 
-    let paths: Vec<Path> = paths.into_iter().map(|p| Path::from_string(&p)).collect();
-
-    let common_prefix = paths.into_iter().reduce(|acc, e| e.common_prefix(acc));
+    let common_prefix = paths
+        .iter()
+        .map(|(p, _)| Path::from_string(&p))
+        .reduce(|acc, e| e.common_prefix(acc));
 
     let prefix_length = common_prefix.map(|p| p.0.len()).unwrap_or(0);
 
-    let operations: Vec<PathOperation> = open_api
-        .paths
+    let operations: Vec<PathOperation> = paths
         .iter()
         .flat_map(|(path, op)| tag_operations(&tag, path, op))
         .collect();
