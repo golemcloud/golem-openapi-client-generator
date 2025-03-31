@@ -17,7 +17,7 @@ use crate::rust::lib_gen::{Module, ModuleDef, ModuleName};
 use crate::rust::model_gen::RefCache;
 use crate::rust::printer::*;
 use crate::rust::types::{
-    ref_or_box_schema_type, ref_or_schema_type, DataType, RustPrinter, RustResult,
+    ref_or_box_schema_type, ref_or_schema_type, DataType, ModelType, RustPrinter, RustResult,
 };
 use crate::{Error, Result};
 use convert_case::{Case, Casing};
@@ -672,16 +672,67 @@ fn render_errors(method_name: &str, error_kind: &ErrorKind, errors: &MethodError
         .reduce(|acc, e| acc + e)
         .unwrap_or_else(unit);
 
+    let display_cases = errors
+        .codes
+        .iter()
+        .map(|(code, model)| {
+            line(
+                unit()
+                    + name.clone()
+                    + "::Error"
+                    + code.to_string()
+                    + "(body) => write!(f, \"{}\", "
+                    + render_error_body_to_string(model)
+                    + "),",
+            )
+        })
+        .reduce(|acc, e| acc + e)
+        .unwrap_or_else(unit);
+
     #[rustfmt::skip]
     let res = unit() +
         line(unit() + "#[derive(Debug)]") +
-        line(unit() + "pub enum " + name + " {") +
+        line(unit() + "pub enum " + name.clone() + " {") +
         indented(
             code_cases
         ) +
-        line(unit() + "}");
+        line(unit() + "}") +
+        line(unit() + "impl std::fmt::Display for " + name.clone() + " {") +
+        indented(
+            line(unit() + "fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {") +
+                indented(
+                    if !errors.codes.is_empty() {
+                         line(unit() + "match self {") +
+                         indented(display_cases) +
+                         line(unit() + "}")
+                       } else { line(unit() + indented(unit() + "write!(f, \"" + name + "\")")) }
+                ) +
+                line("}")
+        ) +
+        line("}");
 
     Ok(res)
+}
+
+fn render_error_body_to_string(typ: &DataType) -> RustPrinter {
+    match typ {
+        DataType::Model(ModelType { name }) if name == "ErrorBody" => unit() + r#"&body.error"#,
+        DataType::Model(ModelType { name }) if name == "ErrorsBody" => {
+            unit() + r#"body.errors.clone().join(", ")"#
+        }
+        DataType::Model(ModelType { name }) if name == "WorkerServiceErrorsBody" => {
+            unit()
+                + "match &body { WorkerServiceErrorsBody::Messages("
+                + rust_name("crate::model", "ErrorsBody")
+                + " { errors }) => { errors.join(\", \") }, WorkerServiceErrorsBody::Validation("
+                + rust_name("crate::model", "ErrorsBody")
+                + " { errors }) => { errors.join(\", \") }}"
+        }
+        DataType::Model(ModelType { name }) if name == "GolemErrorBody" => {
+            unit() + r#"format!("{}", body.golem_error)"#
+        }
+        _ => unit() + r#"format!("{body:?}")"#,
+    }
 }
 
 fn async_annotation() -> RustPrinter {

@@ -29,15 +29,16 @@ pub fn gen(name: &str, version: &str) -> String {
         NewLine +
         "[dependencies]" + NewLine +
         r#"async-trait = "^0.1""# + NewLine +
-        r#"bytes = "^1.5""# + NewLine +
+        r#"bytes = "^1.10""# + NewLine +
         r#"chrono = { version = "^0.4", features = ["serde"] }"# + NewLine +
         r#"futures-core = "^0.3""# + NewLine +
         r#"http = "^1.0""# + NewLine +
-        r#"reqwest = { version = "^0.11", features = ["gzip", "json", "multipart", "stream"] }"# + NewLine +
+        r#"reqwest = { version = "^0.12", features = ["gzip", "json", "multipart", "stream"] }"# + NewLine +
         r#"serde = { version = "^1.0", features = ["derive"] }"# + NewLine +
         r#"serde_json = "^1.0""# + NewLine +
+        r#"thiserror = "^2"# + NewLine +
         r#"tracing = "^0.1""# + NewLine +
-        r#"uuid = { version = "^1.6", features = ["serde"] }"# + NewLine;
+        r#"uuid = { version = "^1.15", features = ["serde"] }"# + NewLine;
 
     StringContext::new().print_to_string(code)
 }
