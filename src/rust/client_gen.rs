@@ -701,7 +701,7 @@ fn render_errors(method_name: &str, error_kind: &ErrorKind, errors: &MethodError
         indented(
             line(unit() + "fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {") +
                 indented(
-                    if errors.codes.len() > 0 {
+                    if !errors.codes.is_empty() {
                          line(unit() + "match self {") +
                          indented(display_cases) +
                          line(unit() + "}")
