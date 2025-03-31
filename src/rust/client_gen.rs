@@ -729,7 +729,7 @@ fn render_error_body_to_string(typ: &DataType) -> RustPrinter {
                 + " { errors }) => { errors.join(\", \") }}"
         }
         DataType::Model(ModelType { name }) if name == "GolemErrorBody" => {
-            unit() + r#"format!("{:?}", body.golem_error)"#
+            unit() + r#"format!("{}", body.golem_error)"#
         }
         _ => unit() + r#"format!("{body:?}")"#,
     }
