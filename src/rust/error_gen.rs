@@ -19,12 +19,17 @@ pub fn error_gen() -> Module {
     let code = indoc! { r#"
         use bytes::Bytes;
 
-        #[derive(Debug)]
+        #[derive(Debug, thiserror::Error)]
         pub enum Error<T> {
+            #[error("{0}")]
             Item(T),
+            #[error("Client error: {0}")]
             Reqwest(reqwest::Error),
+            #[error("Invalid header value: {0}")]
             ReqwestHeader(reqwest::header::InvalidHeaderValue),
+            #[error("Deserialization error: {0}")]
             Serde(serde_json::Error),
+            #[error("Unexpected response - status {code}, data: {body}", body = "String::from_utf8_lossy(data.as_ref())")]
             Unexpected {
                 code: u16,
                 data: Bytes,
