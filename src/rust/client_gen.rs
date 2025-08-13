@@ -17,7 +17,8 @@ use crate::rust::lib_gen::{Module, ModuleDef, ModuleName};
 use crate::rust::model_gen::RefCache;
 use crate::rust::printer::*;
 use crate::rust::types::{
-    ref_or_box_schema_type, ref_or_schema_type, DataType, IntFormat, ModelType, RustPrinter, RustResult
+    ref_or_box_schema_type, ref_or_schema_type, DataType, IntFormat, ModelType, RustPrinter,
+    RustResult,
 };
 use crate::{Error, Result};
 use convert_case::{Case, Casing};
