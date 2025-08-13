@@ -17,7 +17,7 @@ use crate::rust::lib_gen::{Module, ModuleDef, ModuleName};
 use crate::rust::model_gen::RefCache;
 use crate::rust::printer::*;
 use crate::rust::types::{
-    ref_or_box_schema_type, ref_or_schema_type, DataType, ModelType, RustPrinter, RustResult,
+    ref_or_box_schema_type, ref_or_schema_type, DataType, IntFormat, ModelType, RustPrinter, RustResult
 };
 use crate::{Error, Result};
 use convert_case::{Case, Casing};
@@ -748,6 +748,7 @@ fn render_path_param(method: &Method, name: &str) -> RustResult {
             DataType::String => Ok(unit() + &param.name),
             DataType::Uuid => Ok(unit() + "&" + &param.name + ".to_string()"),
             DataType::Model(_) => Ok(unit() + "&" + &param.name + ".to_string()"),
+            DataType::Int(IntFormat::U64) => Ok(unit() + "&" + &param.name + ".to_string()"),
             _ => Err(Error::unexpected(format!(
                 "Unexpected param type {name}: {:?}",
                 param.tpe
