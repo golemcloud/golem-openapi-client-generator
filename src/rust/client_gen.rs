@@ -749,7 +749,7 @@ fn render_path_param(method: &Method, name: &str) -> RustResult {
             DataType::String => Ok(unit() + &param.name),
             DataType::Uuid => Ok(unit() + "&" + &param.name + ".to_string()"),
             DataType::Model(_) => Ok(unit() + "&" + &param.name + ".to_string()"),
-            DataType::Int(IntFormat::U64) => Ok(unit() + "&" + &param.name + ".to_string()"),
+            DataType::Int(_) => Ok(unit() + "&" + &param.name + ".to_string()"),
             _ => Err(Error::unexpected(format!(
                 "Unexpected param type {name}: {:?}",
                 param.tpe
