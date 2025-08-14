@@ -75,12 +75,6 @@ impl<Context: PrintContext> Printer<Context> for String {
     }
 }
 
-pub struct UnitPrinter;
-
-impl<Context> Printer<Context> for UnitPrinter {
-    fn print(&self, _ctx: &mut Context) {}
-}
-
 pub struct IndentPrinter;
 
 impl<C: IndentContext + PrintContext> Printer<C> for IndentPrinter {
@@ -133,14 +127,6 @@ impl<Context> TreePrinter<Context> {
             }
             TreePrinter::Unit => {}
         }
-    }
-}
-
-pub struct TreePrinterPrinter<Context>(TreePrinter<Context>);
-
-impl<Context> Printer<Context> for TreePrinterPrinter<Context> {
-    fn print(&self, ctx: &mut Context) {
-        self.0.print(ctx)
     }
 }
 
