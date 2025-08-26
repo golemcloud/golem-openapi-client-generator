@@ -74,6 +74,7 @@ pub enum DataType {
     MapOf(Box<DataType>),
     Json,
     Yaml,
+    Unit,
 }
 
 pub fn escape_keywords(name: &str) -> String {
@@ -95,6 +96,7 @@ impl DataType {
         }
 
         match self {
+            DataType::Unit => unit() + "()",
             DataType::String => {
                 if top_param {
                     unit() + "&str"
