@@ -19,7 +19,7 @@ pub fn error_gen() -> Module {
     let code = indoc! { r#"
         use bytes::Bytes;
 
-        #[derive(Debug, thiserror::Error)]
+        #[derive(Debug, Clone, thiserror::Error)]
         pub enum Error<T> {
             #[error("{0}")]
             Item(T),
