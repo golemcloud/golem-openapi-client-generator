@@ -493,11 +493,10 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
             "Reference in response top level: {reference}"
         ))),
         ReferenceOr::Item(resp) => {
-            if resp.content.len() != 1 {
-                Err(Error::unimplemented(
-                    "Response content with not exactly 1 option.",
-                ))
-            } else {
+            if resp.content.is_empty() {
+                // No content case
+                Ok(DataType::Unit)
+            } else if resp.content.len() == 1 {
                 let (content_type, media_type) = resp.content.first().unwrap();
 
                 if content_type.starts_with("application/json") {
@@ -520,6 +519,10 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
                         "Response content type: {content_type}"
                     )))
                 }
+            } else {
+                Err(Error::unimplemented(
+                    "Response content with not exactly 1 option.",
+                ))
             }
         }
     }
@@ -748,6 +751,7 @@ fn render_path_param(method: &Method, name: &str) -> RustResult {
             DataType::String => Ok(unit() + &param.name),
             DataType::Uuid => Ok(unit() + "&" + &param.name + ".to_string()"),
             DataType::Model(_) => Ok(unit() + "&" + &param.name + ".to_string()"),
+            DataType::Int(_) => Ok(unit() + "&" + &param.name + ".to_string()"),
             _ => Err(Error::unexpected(format!(
                 "Unexpected param type {name}: {:?}",
                 param.tpe
@@ -882,6 +886,7 @@ fn status_match(range_results: bool, code: &StatusCode) -> RustPrinter {
 fn response_body_parsing(data_type: &DataType) -> RustPrinter {
     match data_type {
         DataType::Binary => unit() + "response.bytes().await?",
+        DataType::Unit => unit() + "()",
         _ => unit() + "response.json::<" + data_type.render_declaration(false) + ">().await?",
     }
 }

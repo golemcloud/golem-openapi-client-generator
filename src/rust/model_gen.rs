@@ -342,20 +342,7 @@ pub fn multipart_field_module() -> Result<Module> {
                 + line("fn to_multipart_field(&self) -> String;")
                 + line("fn mime_type(&self) -> &'static str;"),
         )
-        + line(unit() + "}")
-        + NewLine
-        + line(unit() + "impl<T: std::fmt::Display> MultipartField for T {")
-        + indented(
-            unit()
-                + line("fn to_multipart_field(&self) -> String {")
-                + indented(line("self.to_string()"))
-                + line("}")
-                + NewLine
-                + line(unit() + "fn mime_type(&self) -> &'static str {")
-                + indented(line(r#""text/plain; charset=utf-8""#))
-                + line(unit() + "}"),
-        )
-        + line("}");
+        + line(unit() + "}");
 
     Ok(Module {
         def: ModuleDef {
