@@ -493,7 +493,7 @@ fn response_type(response: &ReferenceOr<Response>, ref_cache: &mut RefCache) -> 
             "Reference in response top level: {reference}"
         ))),
         ReferenceOr::Item(resp) => {
-            if resp.content.len() == 0 {
+            if resp.content.is_empty() {
                 // No content case
                 Ok(DataType::Unit)
             } else if resp.content.len() == 1 {
